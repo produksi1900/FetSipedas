@@ -65,25 +65,30 @@ function tambahLog(teks) {
 }
 
 // ============================================================
-// AUTH
+// AUTH — login didok di panel kiri (bukan fullscreen)
 // ============================================================
+function setLampuKoneksi(aktif) {
+  $("lampu-koneksi").classList.toggle("aktif", aktif);
+}
+
+function bukaKunci(aktif) {
+  // Buka/kunci Section 2 (download) & Section 3 (rekon)
+  $("panel-download").classList.toggle("terbuka", aktif);
+  $("panel-rekon").classList.toggle("terbuka", aktif);
+}
+
 async function cekSesiAwal() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
     await masukKeApp();
   } else {
-    tampilkanLogin();
+    setLampuKoneksi(false);
   }
-}
-
-function tampilkanLogin() {
-  $("view-login").classList.remove("hidden");
-  $("view-app").classList.add("hidden");
 }
 
 async function masukKeApp() {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) { tampilkanLogin(); return; }
+  if (!user) { return; }
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -94,16 +99,31 @@ async function masukKeApp() {
   if (error || !profile) {
     $("login-error").textContent = "Akun ditemukan tapi profil belum terdaftar. Hubungi admin.";
     await supabase.auth.signOut();
-    tampilkanLogin();
+    setLampuKoneksi(false);
     return;
   }
 
   state.profile = profile;
-  $("view-login").classList.add("hidden");
-  $("view-app").classList.remove("hidden");
-  $("lbl-user").textContent = `${profile.nama_tampil} (${profile.role === "prov" ? "Provinsi" : "Kab/Kota"})`;
+
+  // ---- Update UI: header ----
+  const labelUser = `${profile.nama_tampil} (${profile.role === "prov" ? "Provinsi" : "Kab/Kota"})`;
+  $("lbl-user").textContent = labelUser;
+  $("lbl-user").classList.remove("hidden");
+  $("lbl-user-inline").textContent = labelUser;
+  $("btn-logout").classList.remove("hidden");
+  $("info-terakhir").classList.remove("hidden");
+
+  // ---- Update UI: Section 1 ----
+  $("blok-login").classList.add("hidden");
+  $("blok-connected").classList.remove("hidden");
+  $("status-koneksi").textContent = "";
+  setLampuKoneksi(true);
+
+  // ---- Buka kunci Section 2 & 3 ----
+  bukaKunci(true);
 
   // Panel download cuma utk role prov
+  const gridDownload = document.querySelector("#panel-download .grid-tombol-sph");
   if (profile.role !== "prov") {
     $("panel-download").classList.add("hidden");
   } else {
@@ -117,6 +137,21 @@ async function masukKeApp() {
   await muatUlangJenis();
 }
 
+function keluarDariApp() {
+  state.profile = null;
+  $("lbl-user").classList.add("hidden");
+  $("btn-logout").classList.add("hidden");
+  $("info-terakhir").classList.add("hidden");
+
+  $("blok-login").classList.remove("hidden");
+  $("blok-connected").classList.add("hidden");
+  setLampuKoneksi(false);
+  bukaKunci(false);
+
+  $("in-username").value = "";
+  $("in-password").value = "";
+}
+
 $("btn-login").addEventListener("click", login);
 $("in-password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 
@@ -128,6 +163,7 @@ async function login() {
   const username = $("in-username").value.trim().toLowerCase();
   const password = $("in-password").value;
   $("login-error").textContent = "";
+  $("status-koneksi").textContent = "";
 
   if (!username || !password) {
     $("login-error").textContent = "Username & password wajib diisi.";
@@ -136,15 +172,18 @@ async function login() {
 
   $("btn-login").disabled = true;
   $("btn-login").textContent = "Menyambungkan...";
+  $("status-koneksi").textContent = "menyambungkan...";
 
   const email = username + EMAIL_DOMAIN;
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   $("btn-login").disabled = false;
-  $("btn-login").textContent = "Masuk";
+  $("btn-login").textContent = "Sambungkan";
 
   if (error) {
     $("login-error").textContent = "Username atau password salah.";
+    $("status-koneksi").textContent = "";
+    setLampuKoneksi(false);
     return;
   }
   await masukKeApp();
@@ -152,8 +191,7 @@ async function login() {
 
 $("btn-logout").addEventListener("click", async () => {
   await supabase.auth.signOut();
-  state.profile = null;
-  tampilkanLogin();
+  keluarDariApp();
 });
 
 // ============================================================
@@ -250,6 +288,7 @@ $("sel-kab").addEventListener("change", async () => { await siapkanKomoditiSelec
 $("sel-komoditi").addEventListener("change", muatData);
 
 async function muatUlangJenis() {
+  if (!state.profile) return;
   await siapkanTabBar();
   await siapkanKabSelect();
   await muatInfoTerakhir();
@@ -276,6 +315,7 @@ function siapkanTabBar() {
 }
 
 async function siapkanKabSelect() {
+  if (!state.profile) return;
   const selKab = $("sel-kab");
 
   // kabkot: dikunci ke kab_id miliknya sendiri
@@ -320,6 +360,7 @@ async function siapkanKomoditiSelect() {
 }
 
 async function muatData() {
+  if (!state.profile) return;
   const jenis = $("sel-jenis").value;
   const cfg = SPH_CONFIG[jenis];
   const tahun = Number($("sel-tahun-rekon").value);
