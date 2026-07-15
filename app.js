@@ -11,6 +11,8 @@ const state = {
   profile: null,       // {id, username, role, kab_id, nama_tampil}
   tabAktif: null,       // key tab rekon yang sedang dipilih
   chartUtama: null,     // instance Chart.js (di-destroy tiap render ulang)
+  pollPesanTerakhir: null, // dedupe log polling sync_meta
+  pollProgress: 10,        // progress bar sinkronisasi (naik bertahap)
 };
 
 const TAHUN_AWAL = 2018;
@@ -122,18 +124,24 @@ async function masukKeApp() {
   // ---- Buka kunci Section 2 & 3 ----
   bukaKunci(true);
 
-  // Panel download cuma utk role prov (kabkot gak bisa konek ke web
-  // sipedas asli, jadi tombolnya disembunyikan total, bukan cuma dikunci)
+  // Dua mode panel download:
+  // - prov  : sinkronisasi dari web sipedas asli -> Supabase (4 tombol)
+  // - kabkot: TIDAK bisa konek ke web asli, cuma export data miliknya
+  //           sendiri yang SUDAH ADA di Supabase (1 tombol)
   const tombolDownload = ["sbs", "bst", "tbf", "th"].map((j) => $(`btn-dl-${j}`));
-  if (profile.role !== "prov") {
-    $("panel-download").classList.add("hidden");
-    tombolDownload.forEach((b) => (b.disabled = true));
-  } else {
-    $("panel-download").classList.remove("hidden");
+  if (profile.role === "prov") {
+    $("blok-download-prov").classList.remove("hidden");
+    $("blok-download-kabkot").classList.add("hidden");
     tombolDownload.forEach((b) => (b.disabled = false));
+    isiPilihanTahun($("sel-tahun-download"));
+  } else {
+    $("blok-download-prov").classList.add("hidden");
+    $("blok-download-kabkot").classList.remove("hidden");
+    tombolDownload.forEach((b) => (b.disabled = true));
+    isiPilihanTahun($("sel-tahun-dl-kabkot"));
+    $("btn-dl-kabkot").disabled = false;
   }
 
-  isiPilihanTahun($("sel-tahun-download"));
   isiPilihanTahun($("sel-tahun-rekon"));
 
   await siapkanKabSelect();
@@ -152,6 +160,9 @@ function keluarDariApp() {
   bukaKunci(false);
 
   ["sbs", "bst", "tbf", "th"].forEach((j) => { $(`btn-dl-${j}`).disabled = true; });
+  $("btn-dl-kabkot").disabled = true;
+  $("blok-download-prov").classList.add("hidden");
+  $("blok-download-kabkot").classList.add("hidden");
 
   $("in-username").value = "";
   $("in-password").value = "";
@@ -213,6 +224,8 @@ async function mulaiDownload(jenis) {
 
   $("log-download").textContent = `Memulai download ${jenis.toUpperCase()} tahun ${tahun}...`;
   $("progress-download").style.width = "5%";
+  state.pollPesanTerakhir = null;
+  state.pollProgress = 10;
 
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -228,7 +241,7 @@ async function mulaiDownload(jenis) {
     });
 
     // Mulai polling status dari sync_meta selagi request berjalan
-    const pollInterval = setInterval(() => pollStatus(jenis, tahun), 2000);
+    const pollInterval = setInterval(() => pollStatus(jenis, tahun), 3000);
 
     const hasil = await resp.json();
     clearInterval(pollInterval);
@@ -249,15 +262,78 @@ async function mulaiDownload(jenis) {
   }
 }
 
+// ============================================================
+// PANEL KIRI: DOWNLOAD DATA SAYA (khusus kabkot, export dari Supabase)
+// ============================================================
+$("btn-dl-kabkot").addEventListener("click", downloadDataKabkot);
+
+async function downloadDataKabkot() {
+  if (!state.profile || state.profile.role === "prov") return;
+
+  const jenis = $("sel-jenis-dl-kabkot").value;
+  const tahun = Number($("sel-tahun-dl-kabkot").value);
+  const cfg = SPH_CONFIG[jenis];
+  const logBox = $("log-download-kabkot");
+  const btn = $("btn-dl-kabkot");
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Mengambil data...";
+  logBox.textContent = `Mengambil data ${jenis.toUpperCase()} tahun ${tahun} milik ${state.profile.nama_tampil}...`;
+
+  try {
+    const { data: rows, error } = await supabase
+      .from(cfg.table)
+      .select("*")
+      .eq("tahun", tahun)
+      .eq("kab", state.profile.kab_id)
+      .order("urutkec", { ascending: true });
+
+    if (error) throw error;
+
+    if (!rows || rows.length === 0) {
+      logBox.textContent = `Tidak ada data ${jenis.toUpperCase()} tahun ${tahun} untuk kabupaten Anda.\n(Kemungkinan provinsi belum sinkronisasi data ini.)`;
+      return;
+    }
+
+    // Buang kolom internal yang tidak perlu di Excel.
+    const rowsBersih = rows.map(({ id, ...r }) => r);
+
+    const ws = XLSX.utils.json_to_sheet(rowsBersih);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, cfg.label.slice(0, 31));
+
+    const namaKab = DAFTAR_KAB_BABEL.find((k) => k.id === state.profile.kab_id)?.nama ?? state.profile.kab_id;
+    const namaFile = `${cfg.label}_${namaKab.replace(/\s+/g, "")}_${tahun}.xlsx`;
+    XLSX.writeFile(wb, namaFile);
+
+    logBox.textContent = `✓ Selesai! ${rows.length} baris diexport ke "${namaFile}".`;
+  } catch (e) {
+    logBox.textContent = `✗ Gagal mengambil/export data: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⬇ Download Data Saya (Excel)";
+  }
+}
+
 async function pollStatus(jenis, tahun) {
   const { data } = await supabase
     .from("sync_meta")
     .select("status, pesan, last_synced_at")
     .eq("jenis", jenis).eq("tahun", tahun)
     .single();
-  if (data) {
-    tambahLog(`[${data.status}] ${data.pesan ?? ""}`);
-    if (data.status === "proses") $("progress-download").style.width = "50%";
+  if (!data) return;
+
+  const pesanSkrg = `[${data.status}] ${data.pesan ?? ""}`;
+  if (pesanSkrg !== state.pollPesanTerakhir) {
+    tambahLog(pesanSkrg);
+    state.pollPesanTerakhir = pesanSkrg;
+    if (data.status === "proses") {
+      // Naik bertahap tiap ada progres baru (mis. "Selesai kab X..."),
+      // dikunci maksimal 90% -- 100% baru diisi setelah response akhir
+      // dari mulaiDownload() sukses.
+      state.pollProgress = Math.min((state.pollProgress ?? 10) + 8, 90);
+      $("progress-download").style.width = `${state.pollProgress}%`;
+    }
   }
 }
 

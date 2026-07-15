@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="logo.ico">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -43,8 +44,7 @@
 
       <div id="blok-login">
         <div class="field">
-          <label for="in-username">Username</label>
-          <input type="text" id="in-username" autocomplete="username">
+          <input type="text" id="in-username" autocomplete="username" placeholder="Username">
         </div>
         <div class="field">
           <label for="in-password">Password</label>
@@ -72,22 +72,44 @@
           <span>🔒 Sambungkan akun dulu</span>
         </div>
         <div class="isi-terkunci">
-          <div class="section-label">2. Download Data (Provinsi)</div>
+          <!-- ===== Mode PROV: sinkronisasi dari web sipedas asli ke Supabase ===== -->
+          <div id="blok-download-prov" class="hidden">
+            <div class="section-label">2. Sinkronisasi Data (Provinsi)</div>
+            <div class="field">
+              <label>Tahun</label>
+              <select id="sel-tahun-download"></select>
+            </div>
 
-          <div class="field">
-            <label>Tahun</label>
-            <select id="sel-tahun-download"></select>
+            <div class="grid-tombol-sph">
+              <button class="btn-sph sbs" id="btn-dl-sbs" disabled>⬇ SPH-SBS<br>Tabulasi Komoditi</button>
+              <button class="btn-sph bst" id="btn-dl-bst" disabled>⬇ SPH-BST<br>Tabulasi Komoditi</button>
+              <button class="btn-sph tbf" id="btn-dl-tbf" disabled>⬇ SPH-TBF<br>Tabulasi Komoditi</button>
+              <button class="btn-sph th"  id="btn-dl-th" disabled>⬇ SPH-TH<br>Tabulasi Komoditi</button>
+            </div>
+
+            <div class="progress-bar"><div class="isi" id="progress-download"></div></div>
+            <div class="log-box" id="log-download">Menunggu perintah sinkronisasi...</div>
           </div>
 
-          <div class="grid-tombol-sph">
-            <button class="btn-sph sbs" id="btn-dl-sbs" disabled>⬇ SPH-SBS<br>Tabulasi Komoditi</button>
-            <button class="btn-sph bst" id="btn-dl-bst" disabled>⬇ SPH-BST<br>Tabulasi Komoditi</button>
-            <button class="btn-sph tbf" id="btn-dl-tbf" disabled>⬇ SPH-TBF<br>Tabulasi Komoditi</button>
-            <button class="btn-sph th"  id="btn-dl-th" disabled>⬇ SPH-TH<br>Tabulasi Komoditi</button>
+          <!-- ===== Mode KABKOT: export data sendiri dari Supabase (tanpa akses web asli) ===== -->
+          <div id="blok-download-kabkot" class="hidden">
+            <div class="section-label">2. Download Data Saya</div>
+            <div class="field">
+              <label>Jenis SPH</label>
+              <select id="sel-jenis-dl-kabkot">
+                <option value="sbs">SPH-SBS</option>
+                <option value="bst">SPH-BST</option>
+                <option value="tbf">SPH-TBF</option>
+                <option value="th">SPH-TH</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tahun</label>
+              <select id="sel-tahun-dl-kabkot"></select>
+            </div>
+            <button class="btn-login" id="btn-dl-kabkot" disabled>⬇ Download Data Saya (Excel)</button>
+            <div class="log-box" id="log-download-kabkot">Data diambil dari Supabase (hasil sinkronisasi provinsi terakhir).</div>
           </div>
-
-          <div class="progress-bar"><div class="isi" id="progress-download"></div></div>
-          <div class="log-box" id="log-download">Menunggu perintah download...</div>
         </div>
       </div>
     </div>
