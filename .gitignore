@@ -1,0 +1,9 @@
+# Supabase CLI cache/temp
+supabase/.temp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/

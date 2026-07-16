@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FetSipedas Web</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="logo.ico">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ================= SPLASH (tampil ±1.5 detik saat pertama buka) ================= -->
+  <div id="splash">
+    <img src="logo.ico" alt="FetSipedas" class="splash-logo" onerror="this.style.display='none'">
+    <div class="splash-text" id="splash-text">Memuat</div>
+  </div>
+
+  <!-- ================= HEADER (selalu tampil) ================= -->
+  <div class="header">
+    <img src="logo.ico" alt="" class="logo-header" onerror="this.style.display='none'">
+    <span class="judul">FetSipedas</span>
+    <span class="subjudul">Asisten Data Sipedas Hortikultura</span>
+    <div class="spacer"></div>
+    <span class="user-info hidden" id="lbl-user"></span>
+    <button class="logout hidden" id="btn-logout">Keluar</button>
+  </div>
+
+  <div class="info-bar hidden" id="info-terakhir">Memuat info data terakhir...</div>
+
+  <!-- ================= APP SHELL (selalu tampil) ================= -->
+  <div class="app-shell">
+
+    <!-- ---------- PANEL KIRI ---------- -->
+    <div class="panel-kiri">
+
+      <!-- ===== SECTION 1: SAMBUNGKAN AKUN ===== -->
+      <div class="section-label-row">
+        <span class="section-label">1. Sambungkan Akun</span>
+        <span class="lampu-koneksi" id="lampu-koneksi"></span>
+        <span class="status-koneksi" id="status-koneksi"></span>
+      </div>
+
+      <div id="blok-login">
+        <div class="field">
+          <input type="text" id="in-username" autocomplete="username" placeholder="Username">
+        </div>
+        <div class="field">
+          <label for="in-password">Password</label>
+          <input type="password" id="in-password" placeholder="Password" autocomplete="current-password">
+        </div>
+        <div class="chk">
+          <input type="checkbox" id="chk-show-pass">
+          <label for="chk-show-pass" style="margin:0;">Tampilkan password</label>
+        </div>
+        <button class="btn-login" id="btn-login">Sambungkan</button>
+        <div class="pesan-error" id="login-error"></div>
+      </div>
+
+      <div id="blok-connected" class="hidden">
+        <div class="info-connected">
+          Tersambung sebagai<br><strong id="lbl-user-inline"></strong>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ===== SECTION 2: DOWNLOAD DATA (dari database, sama utk semua role) =====
+           Data di database sudah diisi oleh aplikasi desktop FetSipedas (yang
+           konek ke web sipedas asli & upload ke sini). Web ini TIDAK lagi
+           konek ke sipedas.pertanian.go.id sama sekali -- cuma baca dari
+           database. -->
+      <div id="panel-download" class="blok-terkunci">
+        <div class="overlay-terkunci">
+          <span>🔒 Sambungkan akun dulu</span>
+        </div>
+        <div class="isi-terkunci">
+          <div class="section-label">2. Download Data</div>
+
+          <div class="field">
+            <label>Jenis SPH</label>
+            <select id="sel-jenis-download">
+              <option value="sbs">SPH-SBS</option>
+              <option value="bst">SPH-BST</option>
+              <option value="tbf">SPH-TBF</option>
+              <option value="th">SPH-TH</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tahun</label>
+            <select id="sel-tahun-download"></select>
+          </div>
+          <div class="field hidden" id="wrap-kab-download">
+            <label>Kabupaten</label>
+            <select id="sel-kab-download">
+              <option value="semua">— Semua Kabupaten/Kota —</option>
+            </select>
+          </div>
+
+          <button class="btn-login" id="btn-download" disabled>⬇ Download Data (Excel)</button>
+          <div class="log-box" id="log-download">Data diambil dari database (hasil sinkronisasi terakhir dari aplikasi desktop).</div>
+          <div class="catatan-kecil">
+            File Excel hasil download ini bisa langsung dipakai di aplikasi
+            desktop FetSipedas, menu "3. Rekonsiliasi" → Pilih File Raw →
+            Hasilkan Excel Rekon (untuk versi Excel dengan dropdown &amp; grafik).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- PANEL KANAN: REKON (disabled sampai login, scroll di sini saja) ---------- -->
+    <div class="panel-kanan blok-terkunci" id="panel-rekon">
+      <div class="overlay-terkunci">
+        <span>🔒 Sambungkan akun untuk mulai rekonsiliasi</span>
+      </div>
+      <div class="isi-terkunci">
+        <div class="section-label">3. Rekonsiliasi Data</div>
+
+        <div class="rekon-slicer">
+          <div class="field">
+            <label>Jenis SPH</label>
+            <select id="sel-jenis">
+              <option value="sbs">SPH-SBS</option>
+              <option value="bst">SPH-BST</option>
+              <option value="tbf">SPH-TBF</option>
+              <option value="th">SPH-TH</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tahun</label>
+            <select id="sel-tahun-rekon"></select>
+          </div>
+          <div class="field">
+            <label>Kabupaten</label>
+            <select id="sel-kab"></select>
+          </div>
+          <div class="field">
+            <label>Komoditi</label>
+            <select id="sel-komoditi"></select>
+          </div>
+        </div>
+
+        <div class="tab-bar" id="tab-bar"></div>
+
+        <div id="rekon-area">
+          <div class="placeholder-kosong">Pilih jenis SPH, tahun, kabupaten & komoditi untuk mulai.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module" src="app.js"></script>
+<script>
+  // Splash logo: tampil ~1.5 detik, lalu fade out halus (independen dari app.js
+  // supaya splash tetap muncul walau koneksi Supabase lambat/gagal).
+  (function () {
+    var splash = document.getElementById("splash");
+    if (!splash) return;
+    setTimeout(function () {
+      splash.classList.add("splash-hide");
+      setTimeout(function () {
+        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+      }, 450);
+    }, 1500);
+  })();
+</script>
+</body>
+</html>
