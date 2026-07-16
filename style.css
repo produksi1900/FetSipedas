@@ -201,6 +201,7 @@ table.tabel-rekon th { background: var(--hijau-muda); color: var(--putih); }
 table.tabel-rekon td.nama { text-align: left; }
 table.tabel-rekon tr:nth-child(even) td { background: #f8f8f8; }
 table.tabel-rekon td.outlier { background: #fff176 !important; font-weight: bold; }
+table.tabel-rekon td.outlier-rata { background: #fffacd !important; font-weight: bold; }
 
 .chart-wrap { background: var(--putih); border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; margin-bottom: 20px; }
 .chart-wrap h4 { margin: 0 0 8px; font-size: 13px; color: var(--hijau-tua); }

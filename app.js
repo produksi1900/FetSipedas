@@ -10,7 +10,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const state = {
   profile: null,       // {id, username, role, kab_id, nama_tampil}
   tabAktif: null,       // key tab rekon yang sedang dipilih
-  chartUtama: null,     // instance Chart.js (di-destroy tiap render ulang)
+  chartInstances: [],   // instance-instance Chart.js aktif (di-destroy tiap render ulang)
 };
 
 const TAHUN_AWAL = 2018;
@@ -423,7 +423,8 @@ async function muatData() {
 
   area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
 
-  const { data: rows, error } = await supabase
+  // Data kabupaten terpilih (utk tabel utama & grafik per kecamatan)
+  const { data: rowsKab, error } = await supabase
     .from(cfg.table)
     .select("*")
     .eq("tahun", tahun)
@@ -435,107 +436,154 @@ async function muatData() {
     area.innerHTML = `<div class="placeholder-kosong">Gagal memuat data: ${error.message}</div>`;
     return;
   }
-  if (!rows || rows.length === 0) {
+  if (!rowsKab || rowsKab.length === 0) {
     area.innerHTML = `<div class="placeholder-kosong">Tidak ada data untuk kombinasi ini.</div>`;
     return;
   }
 
-  renderRekon(cfg, rows, komoditi);
+  // Data SEMUA kabupaten (komoditi & tahun sama) utk tabel & grafik
+  // "Rata-Rata ... menurut Kabupaten & Bulan/Triwulan" (persis spt desktop).
+  // RLS Supabase otomatis membatasi ini kalau role-nya kabkot.
+  const { data: rowsSemua, error: errSemua } = await supabase
+    .from(cfg.table)
+    .select("*")
+    .eq("tahun", tahun)
+    .eq("namatanaman", komoditi);
+
+  renderRekon(cfg, rowsKab, errSemua ? [] : (rowsSemua || []), komoditi);
 }
 
-function renderRekon(cfg, rows, komoditi) {
-  const tab = cfg.tabs.find((t) => t.key === state.tabAktif) ?? cfg.tabs[0];
-  const periodeCol = cfg.periodeCol;
-  const periodeLabels = cfg.periodeLabels; // index 0 = periode 1
+// ---- Helper umum ----
 
-  // Kumpulkan daftar kecamatan unik (urut sesuai urutkec)
-  const kecMap = new Map(); // kec_id -> {kode, nama, urut}
+function nilaiFromRow(r, tab) {
+  if (tab.single) return Number(r[tab.single]) || 0;
+  // PENTING (fix bug 100x): produksi disimpan Kg, luas/denom lain
+  // disimpan satuan aslinya (M2 utk luas, pohon utk BST). numerFactor
+  // dipakai supaya hasil provitas dalam Kuintal/Ha (atau Kg/Pohon utk
+  // BST) sama seperti aplikasi desktop.
+  const numer = (Number(r[tab.numer]) || 0) * (tab.numerFactor ?? 1);
+  const denom = Number(r[tab.denom]) || 0;
+  return denom !== 0 ? numer / denom : 0;
+}
+
+function pivotKec(rows) {
+  const kecMap = new Map();
   for (const r of rows) {
     if (!kecMap.has(r.kec)) kecMap.set(r.kec, { kode: r.kec, nama: r.nama_kec, urut: r.urutkec ?? 0 });
   }
-  const kecRows = Array.from(kecMap.values()).sort((a, b) => a.urut - b.urut);
+  return Array.from(kecMap.values()).sort((a, b) => a.urut - b.urut);
+}
 
-  // Bangun matrix (kec, periode) -> nilai sesuai tab aktif
-  function nilaiBaris(r) {
-    if (tab.single) return Number(r[tab.single]) || 0;
-    const numer = (Number(r[tab.numer]) || 0) * (tab.numerFactor ?? 1);
-    const denom = Number(r[tab.denom]) || 0;
-    return denom !== 0 ? numer / denom : 0;
-  }
-
-  const matrix = new Map(); // `${kec}|${periode}` -> nilai
-  for (const r of rows) {
-    const per = Number(r[periodeCol]);
-    matrix.set(`${r.kec}|${per}`, nilaiBaris(r));
-  }
-
+// Tabel kecamatan x periode, dgn kolom Mean & Stdev, highlight outlier
+// (IQR method persis spt desktop fitur_rekon.py: _iqr_bounds/_is_outlier,
+// nilai 0 diabaikan, minimal 4 nilai valid).
+function buatTabelKecPeriode({ judul, satuan, kecRows, matrix, nPeriode, headerLabels, desimal = 2 }) {
   const semuaNilai = [];
-  for (const k of kecRows) {
-    for (let p = 1; p <= periodeLabels.length; p++) {
-      semuaNilai.push(matrix.get(`${k.kode}|${p}`) ?? 0);
-    }
-  }
+  for (const k of kecRows) for (let p = 1; p <= nPeriode; p++) semuaNilai.push(matrix.get(`${k.kode}|${p}`) ?? 0);
   const [lo, hi] = iqrBounds(semuaNilai);
 
-  const area = $("rekon-area");
-  area.innerHTML = "";
-
-  // ---- Tabel ----
   const blok = document.createElement("div");
   blok.className = "tabel-blok";
-  blok.innerHTML = `
-    <div class="tabel-judul">
-      <span>${tab.label} — ${komoditi}</span>
-      <span class="satuan">${tab.satuan}</span>
-    </div>
-  `;
+  blok.innerHTML = `<div class="tabel-judul"><span>${judul}</span><span class="satuan">${satuan}</span></div>`;
+
   const table = document.createElement("table");
   table.className = "tabel-rekon";
-
-  const theadCols = ["No", "Kode", "Kecamatan", ...periodeLabels.map((p) => (cfg.periodeCol === "triwulan" ? `Tw${p}` : p)), "Mean"];
+  const theadCols = ["No", "Kode", "Kecamatan", ...headerLabels, "Mean", "Stdev"];
   table.innerHTML = `<thead><tr>${theadCols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>`;
 
   const tbody = document.createElement("tbody");
   kecRows.forEach((k, i) => {
     const tr = document.createElement("tr");
     let tds = `<td>${i + 1}</td><td>${k.kode}</td><td class="nama">${k.nama}</td>`;
-    const nilaiBarisIni = [];
-    for (let p = 1; p <= periodeLabels.length; p++) {
+    const rowVals = [];
+    for (let p = 1; p <= nPeriode; p++) {
       const v = matrix.get(`${k.kode}|${p}`) ?? 0;
-      nilaiBarisIni.push(v);
+      rowVals.push(v);
       const outlierCls = isOutlier(v, lo, hi) ? " outlier" : "";
-      tds += `<td class="${outlierCls}">${fmt(v, tab.single === "harga_jual_petani" ? 0 : 2)}</td>`;
+      tds += `<td class="${outlierCls}">${fmt(v, desimal)}</td>`;
     }
-    const nz = nilaiBarisIni.filter((v) => v !== 0);
+    const nz = rowVals.filter((v) => v !== 0);
     const mean = nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : 0;
-    tds += `<td>${fmt(mean, tab.single === "harga_jual_petani" ? 0 : 2)}</td>`;
+    const std = nz.length > 1 ? Math.sqrt(nz.reduce((a, b) => a + (b - mean) ** 2, 0) / nz.length) : 0;
+    tds += `<td>${fmt(mean, desimal)}</td><td>${nz.length > 1 ? fmt(std, desimal + 1) : "-"}</td>`;
     tr.innerHTML = tds;
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
   blok.appendChild(table);
-  area.appendChild(blok);
+  return blok;
+}
 
-  // ---- Grafik ----
-  const chartWrap = document.createElement("div");
-  chartWrap.className = "chart-wrap";
-  chartWrap.innerHTML = `<h4>Grafik ${tab.label} — ${komoditi}</h4><canvas id="canvas-chart-utama"></canvas>`;
-  area.appendChild(chartWrap);
+// Tabel "Rata-Rata ... menurut Kabupaten & Bulan/Triwulan" — satu baris
+// per kabupaten (SEMUA 7 kab, bukan cuma yg dipilih), nilainya rata-rata
+// antar kecamatan per periode. Outlier dihitung per-baris (per kab),
+// persis logic desktop _tulis_tabel_rata2_prov/_simple.
+function buatTabelRata2PerKab({ judul, tab, cfg, rowsSemua, nPeriode, headerLabels, desimal = 2 }) {
+  const labelAxis = cfg.periodeCol === "triwulan" ? "Triwulan" : "Bulan";
+  const blok = document.createElement("div");
+  blok.className = "tabel-blok";
+  blok.innerHTML = `<div class="tabel-judul"><span>Rata-Rata ${judul} menurut Kabupaten &amp; ${labelAxis}</span></div>`;
 
-  if (state.chartUtama) state.chartUtama.destroy();
-  const ctx = document.getElementById("canvas-chart-utama").getContext("2d");
-  const labelsX = periodeLabels.map((p) => (cfg.periodeCol === "triwulan" ? `Tw${p}` : p));
-  const palet = ["#1f9d6e", "#c0392b", "#2980b9", "#e67e22", "#8e44ad", "#16a085", "#d35400", "#7f8c8d", "#2c3e50", "#f39c12"];
+  const table = document.createElement("table");
+  table.className = "tabel-rekon";
+  table.innerHTML = `<thead><tr>${["Kabupaten", ...headerLabels].map((c) => `<th>${c}</th>`).join("")}</tr></thead>`;
+  const tbody = document.createElement("tbody");
 
-  state.chartUtama = new Chart(ctx, {
+  const perKabAvg = {}; // kab.id -> [rata2 per periode]
+
+  for (const kab of DAFTAR_KAB_BABEL) {
+    const rowsKabIni = rowsSemua.filter((r) => r.nama_kab === kab.id);
+    const kecKeys = Array.from(new Set(rowsKabIni.map((r) => r.kec)));
+    const matrix = new Map();
+    for (const r of rowsKabIni) {
+      const per = Number(r[cfg.periodeCol]);
+      matrix.set(`${r.kec}|${per}`, nilaiFromRow(r, tab));
+    }
+
+    const rataPerPeriode = [];
+    for (let p = 1; p <= nPeriode; p++) {
+      const vals = kecKeys.map((kid) => matrix.get(`${kid}|${p}`) ?? 0);
+      const nz = vals.filter((v) => v !== 0);
+      rataPerPeriode.push(nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : null);
+    }
+    perKabAvg[kab.id] = rataPerPeriode;
+
+    const nonZero = rataPerPeriode.filter((v) => v !== null && v !== 0);
+    const [lo, hi] = iqrBounds(nonZero);
+
+    const tr = document.createElement("tr");
+    let tds = `<td class="nama">${kab.nama}</td>`;
+    rataPerPeriode.forEach((v) => {
+      const cls = v !== null && isOutlier(v, lo, hi) ? " outlier-rata" : "";
+      tds += `<td class="${cls}">${v === null ? "-" : fmt(v, desimal)}</td>`;
+    });
+    tr.innerHTML = tds;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  blok.appendChild(table);
+  return { blok, perKabAvg };
+}
+
+const PALET_WARNA = ["#1f9d6e", "#c0392b", "#2980b9", "#e67e22", "#8e44ad", "#16a085", "#d35400", "#7f8c8d", "#2c3e50", "#f39c12"];
+
+function tambahkanGrafik(area, judul, labelsX, series, yTitle) {
+  const wrap = document.createElement("div");
+  wrap.className = "chart-wrap";
+  const canvasId = "canvas-chart-" + Math.random().toString(36).slice(2);
+  wrap.innerHTML = `<h4>${judul}</h4><canvas id="${canvasId}"></canvas>`;
+  area.appendChild(wrap);
+
+  const ctx = document.getElementById(canvasId).getContext("2d");
+  const chart = new Chart(ctx, {
     type: "line",
     data: {
       labels: labelsX,
-      datasets: kecRows.map((k, i) => ({
-        label: k.nama,
-        data: periodeLabels.map((_, idx) => matrix.get(`${k.kode}|${idx + 1}`) ?? null),
-        borderColor: palet[i % palet.length],
-        backgroundColor: palet[i % palet.length],
+      datasets: series.map((s, i) => ({
+        label: s.label,
+        data: s.data,
+        borderColor: PALET_WARNA[i % PALET_WARNA.length],
+        backgroundColor: PALET_WARNA[i % PALET_WARNA.length],
         spanGaps: true,
         tension: 0,
       })),
@@ -543,9 +591,90 @@ function renderRekon(cfg, rows, komoditi) {
     options: {
       responsive: true,
       plugins: { legend: { position: "right", labels: { boxWidth: 12, font: { size: 10 } } } },
-      scales: { y: { beginAtZero: true } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: yTitle } } },
     },
   });
+  state.chartInstances.push(chart);
+}
+
+function renderRekon(cfg, rowsKab, rowsSemua, komoditi) {
+  const tab = cfg.tabs.find((t) => t.key === state.tabAktif) ?? cfg.tabs[0];
+  const periodeCol = cfg.periodeCol;
+  const nPeriode = cfg.periodeLabels.length;
+  const headerLabels = cfg.periodeLabels.map((p) => (periodeCol === "triwulan" ? `Tw${p}` : p));
+  const desimalUtama = tab.single === "harga_jual_petani" ? 0 : 2;
+
+  const kecRows = pivotKec(rowsKab);
+  const matrixUtama = new Map();
+  for (const r of rowsKab) {
+    const per = Number(r[periodeCol]);
+    matrixUtama.set(`${r.kec}|${per}`, nilaiFromRow(r, tab));
+  }
+
+  const area = $("rekon-area");
+  area.innerHTML = "";
+  state.chartInstances.forEach((c) => c.destroy());
+  state.chartInstances = [];
+
+  // ---- Tabel utama (Provitas atau Harga) ----
+  area.appendChild(buatTabelKecPeriode({
+    judul: `${tab.label} — ${komoditi}`, satuan: tab.satuan,
+    kecRows, matrix: matrixUtama, nPeriode, headerLabels, desimal: desimalUtama,
+  }));
+
+  // ---- Tabel raw (khusus tab provitas: Produksi & Luas/Tanaman) ----
+  if (!tab.single && tab.rawNumer) {
+    const matrixNumer = new Map();
+    for (const r of rowsKab) {
+      const per = Number(r[periodeCol]);
+      matrixNumer.set(`${r.kec}|${per}`, (Number(r[tab.numer]) || 0) * (tab.rawNumer.factor ?? 1));
+    }
+    area.appendChild(buatTabelKecPeriode({
+      judul: `${tab.rawNumer.label} — ${komoditi}`, satuan: tab.rawNumer.satuan,
+      kecRows, matrix: matrixNumer, nPeriode, headerLabels, desimal: 2,
+    }));
+  }
+  if (!tab.single && tab.rawDenom) {
+    const matrixDenom = new Map();
+    for (const r of rowsKab) {
+      const per = Number(r[periodeCol]);
+      matrixDenom.set(`${r.kec}|${per}`, (Number(r[tab.denom]) || 0) * (tab.rawDenom.factor ?? 1));
+    }
+    area.appendChild(buatTabelKecPeriode({
+      judul: `${tab.rawDenom.label} — ${komoditi}`, satuan: tab.rawDenom.satuan,
+      kecRows, matrix: matrixDenom, nPeriode, headerLabels, desimal: 2,
+    }));
+  }
+
+  // ---- Tabel Rata-Rata menurut Kabupaten & Bulan/Triwulan (semua 7 kab) ----
+  const { perKabAvg } = (() => {
+    const r = buatTabelRata2PerKab({
+      judul: `${tab.label} — ${komoditi}`, tab, cfg, rowsSemua, nPeriode, headerLabels, desimal: desimalUtama,
+    });
+    area.appendChild(r.blok);
+    return r;
+  })();
+
+  // ---- Grafik per Kecamatan (kabupaten terpilih) ----
+  tambahkanGrafik(
+    area,
+    `Grafik ${tab.label} per Kecamatan — ${komoditi}`,
+    headerLabels,
+    kecRows.map((k) => ({
+      label: k.nama,
+      data: Array.from({ length: nPeriode }, (_, idx) => matrixUtama.get(`${k.kode}|${idx + 1}`) ?? null),
+    })),
+    tab.satuan
+  );
+
+  // ---- Grafik Rata-Rata per Kabupaten (semua 7 kab) ----
+  tambahkanGrafik(
+    area,
+    `Grafik Rata-Rata ${tab.label} per Kabupaten — ${komoditi}`,
+    headerLabels,
+    DAFTAR_KAB_BABEL.map((kab) => ({ label: kab.nama, data: perKabAvg[kab.id] })),
+    tab.satuan
+  );
 }
 
 // ============================================================
