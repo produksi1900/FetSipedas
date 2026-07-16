@@ -149,5 +149,5 @@ export const DAFTAR_KAB_BABEL = [
   { id: "Bangka Tengah", nama: "Kab. Bangka Tengah" },
   { id: "Bangka Selatan", nama: "Kab. Bangka Selatan" },
   { id: "Belitung Timur", nama: "Kab. Belitung Timur" },
-  { id: "Pangkal Pinang", nama: "Kota Pangkal Pinang" },
+  { id: "Kota Pangkalpinang", nama: "Kota Pangkal Pinang" },
 ];

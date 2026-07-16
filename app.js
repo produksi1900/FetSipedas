@@ -240,7 +240,12 @@ async function downloadData() {
   // untuk kabkot selalu dikunci ke kabupatennya sendiri).
   let kabNama = null;
   if (state.profile.role === "kabkot") {
-    kabNama = state.profile.kab_id;
+    // Ambil nama_kab dari DB supaya cocok persis dengan kolom nama_kab
+    // di tabel data_* (bisa beda dengan kab_id di profile, mis.
+    // "Kota Pangkalpinang" di DB vs "Pangkal Pinang" di profile).
+    const { data: sampleRow } = await supabase
+      .from(cfg.table).select("nama_kab").eq("tahun", tahun).limit(1).maybeSingle();
+    kabNama = sampleRow?.nama_kab ?? state.profile.kab_id;
   } else {
     const pilihan = $("sel-kab-download").value;
     kabNama = pilihan === "semua" ? null : pilihan;
@@ -349,9 +354,10 @@ $("sel-komoditi").addEventListener("change", muatData);
 
 async function muatUlangJenis() {
   if (!state.profile) return;
-  await siapkanTabBar();
+  siapkanTabBar();
   await siapkanKabSelect();
   await muatInfoTerakhir();
+  await muatData();
 }
 
 function siapkanTabBar() {
@@ -378,11 +384,25 @@ async function siapkanKabSelect() {
   if (!state.profile) return;
   const selKab = $("sel-kab");
 
-  // kabkot: dikunci ke kabupatennya sendiri (profile.kab_id berisi
-  // nama_kab, sama seperti yang dipakai untuk filter "nama_kab" di DB).
+  // kabkot: dikunci ke kabupatennya sendiri.
+  // Ambil nama_kab dari DB (RLS sudah filter ke kab miliknya) supaya
+  // value di select selalu cocok persis dengan kolom nama_kab di DB,
+  // tidak bergantung pada kab_id di profile yang bisa beda penulisan.
   if (state.profile.role === "kabkot") {
-    const kab = DAFTAR_KAB_BABEL.find((k) => k.id === state.profile.kab_id);
-    selKab.innerHTML = `<option value="${state.profile.kab_id}">${kab ? kab.nama : state.profile.kab_id}</option>`;
+    const jenis = $("sel-jenis").value;
+    const cfg = SPH_CONFIG[jenis];
+    const tahun = Number($("sel-tahun-rekon").value);
+    const { data: rowsSample } = await supabase
+      .from(cfg.table)
+      .select("nama_kab")
+      .eq("tahun", tahun)
+      .limit(1)
+      .maybeSingle();
+    // Jika tahun ini belum ada data, fallback ke kab_id dari profile.
+    const namakabDB = rowsSample?.nama_kab ?? state.profile.kab_id;
+    const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === namakabDB);
+    const labelKab = kabEntry ? kabEntry.nama : namakabDB;
+    selKab.innerHTML = `<option value="${namakabDB}">${labelKab}</option>`;
     selKab.disabled = true;
     await siapkanKomoditiSelect();
     return;
