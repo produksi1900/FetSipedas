@@ -314,16 +314,20 @@ async function downloadData() {
 
 async function muatInfoTerakhir() {
   const jenis = $("sel-jenis").value;
+  const tahun = Number($("sel-tahun-rekon").value);
+
   const { data } = await supabase
     .from("sync_meta")
     .select("tahun, last_synced_at, status")
     .eq("jenis", jenis)
+    .eq("tahun", tahun)
     .order("last_synced_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (!data) {
-    $("info-terakhir").innerHTML = `Belum ada data ${jenis.toUpperCase()} yang pernah disinkronkan.`;
+    $("info-terakhir").innerHTML =
+      `Belum ada data <strong>${jenis.toUpperCase()}</strong> tahun <strong>${tahun}</strong> yang pernah disinkronkan.`;
     return;
   }
   const tgl = new Date(data.last_synced_at);
@@ -339,7 +343,7 @@ async function muatInfoTerakhir() {
 // PANEL KANAN: REKON
 // ============================================================
 $("sel-jenis").addEventListener("change", muatUlangJenis);
-$("sel-tahun-rekon").addEventListener("change", async () => { await siapkanKabSelect(); await muatData(); });
+$("sel-tahun-rekon").addEventListener("change", async () => { await muatInfoTerakhir(); await siapkanKabSelect(); await muatData(); });
 $("sel-kab").addEventListener("change", async () => { await siapkanKomoditiSelect(); await muatData(); });
 $("sel-komoditi").addEventListener("change", muatData);
 
