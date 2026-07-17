@@ -173,6 +173,12 @@ async function masukKeApp() {
   // ---- Section 3: Referensi ID Tanaman (khusus prov) ----
   $("panel-referensi").classList.toggle("hidden", profile.role !== "prov");
 
+  // ---- Penomoran section Rekonsiliasi: geser jadi "3." utk kabkot
+  // karena mereka tidak punya section 3 (Referensi ID Tanaman) ----
+  $("label-rekon").textContent = profile.role === "prov"
+    ? "4. Rekonsiliasi Data"
+    : "3. Rekonsiliasi Data";
+
   await muatReferensiIdTanaman();
   await siapkanKabSelect();
   await muatUlangJenis();
