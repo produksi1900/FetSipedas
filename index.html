@@ -131,43 +131,82 @@
       </div>
     </div>
 
-    <!-- ---------- PANEL KANAN: REKON (disabled sampai login, scroll di sini saja) ---------- -->
+    <!-- ---------- PANEL KANAN: REKON / RANGKUMAN (disabled sampai login, scroll di sini saja) ---------- -->
     <div class="panel-kanan blok-terkunci" id="panel-rekon">
       <div class="overlay-terkunci">
         <span>🔒 Sambungkan akun untuk mulai rekonsiliasi</span>
       </div>
       <div class="isi-terkunci">
-        <div class="section-label" id="label-rekon">4. Rekonsiliasi Data</div>
+        <div class="section-label" id="label-rekon">4. Rekonsiliasi &amp; Rangkuman Data</div>
 
-        <div class="rekon-slicer">
-          <div class="field">
-            <label>Jenis SPH</label>
-            <select id="sel-jenis">
-              <option value="sbs">SPH-SBS</option>
-              <option value="bst">SPH-BST</option>
-              <option value="tbf">SPH-TBF</option>
-              <option value="th">SPH-TH</option>
-            </select>
+        <!-- Toggle pilih tampilan panel kanan -->
+        <div class="panel-toggle" id="panel-toggle">
+          <button type="button" class="toggle-btn aktif" id="btn-view-rekon">Rekonsiliasi Data</button>
+          <button type="button" class="toggle-btn" id="btn-view-rangkuman">Rangkuman Data</button>
+        </div>
+
+        <!-- ===== VIEW: REKONSILIASI ===== -->
+        <div id="view-rekon">
+          <div class="rekon-slicer">
+            <div class="field">
+              <label>Jenis SPH</label>
+              <select id="sel-jenis">
+                <option value="sbs">SPH-SBS</option>
+                <option value="bst">SPH-BST</option>
+                <option value="tbf">SPH-TBF</option>
+                <option value="th">SPH-TH</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tahun</label>
+              <select id="sel-tahun-rekon"></select>
+            </div>
+            <div class="field">
+              <label>Kabupaten</label>
+              <select id="sel-kab"></select>
+            </div>
+            <div class="field">
+              <label>Komoditi</label>
+              <select id="sel-komoditi"></select>
+            </div>
           </div>
-          <div class="field">
-            <label>Tahun</label>
-            <select id="sel-tahun-rekon"></select>
-          </div>
-          <div class="field">
-            <label>Kabupaten</label>
-            <select id="sel-kab"></select>
-          </div>
-          <div class="field">
-            <label>Komoditi</label>
-            <select id="sel-komoditi"></select>
+
+          <div class="tab-bar" id="tab-bar"></div>
+
+          <div id="rekon-area">
+            <div class="placeholder-kosong">Pilih jenis SPH, tahun, kabupaten & komoditi untuk mulai.</div>
           </div>
         </div>
 
-        <div class="tab-bar" id="tab-bar"></div>
+        <!-- ===== VIEW: RANGKUMAN DATA ===== -->
+        <div id="view-rangkuman" class="hidden">
+          <div class="rekon-slicer">
+            <div class="field">
+              <label>Jenis SPH</label>
+              <select id="sel-jenis-rangkuman">
+                <option value="sbs">SPH-SBS</option>
+                <option value="bst">SPH-BST</option>
+                <option value="tbf">SPH-TBF</option>
+                <option value="th">SPH-TH</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tahun</label>
+              <select id="sel-tahun-rangkuman"></select>
+            </div>
+            <div class="field">
+              <label>Kabupaten</label>
+              <select id="sel-kab-rangkuman">
+                <option value="semua">— Semua Kabupaten/Kota (Provinsi) —</option>
+              </select>
+            </div>
+          </div>
 
-        <div id="rekon-area">
-          <div class="placeholder-kosong">Pilih jenis SPH, tahun, kabupaten & komoditi untuk mulai.</div>
+          <div id="rangkuman-area">
+            <div class="placeholder-kosong">Pilih jenis SPH, tahun & kabupaten untuk mulai.</div>
+          </div>
         </div>
+
       </div>
     </div>
   </div>

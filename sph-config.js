@@ -10,6 +10,13 @@
 // jual petani", dst) supaya file Excel yang didownload dari web ini bisa
 // LANGSUNG dipakai di menu "3. Rekonsiliasi" -> "Pilih File Raw" di
 // aplikasi desktop untuk membuat Excel rekon dinamis (dengan dropdown).
+//
+// `rangkuman` = konfigurasi utk Panel "Rangkuman Data" (total produksi
+// per komoditi per bulan/triwulan se-kabupaten/provinsi, dgn growth
+// q-to-q & y-on-y). produksiCol = kolom DB yang dipakai sbg nilai
+// produksi, factor = pengali supaya hasilnya dalam satuan Kuintal
+// (kolom produksi_habis/produksi_belum_habis di DB disimpan dalam Kg,
+// jadi factor 0.01; khusus BST kolom "produksi" sudah dalam Kuintal).
 
 export const SPH_CONFIG = {
   sbs: {
@@ -43,6 +50,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
+    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
   },
   tbf: {
     label: "SPH-TBF",
@@ -72,6 +80,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
+    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
   },
   th: {
     label: "SPH-TH",
@@ -99,6 +108,7 @@ export const SPH_CONFIG = {
       produksi_habis:     "Produksi Habis (Kg)",
       harga_jual_petani:  "Harga jual petani (Rp/kg)",
     },
+    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
   },
   bst: {
     label: "SPH-BST",
@@ -130,6 +140,7 @@ export const SPH_CONFIG = {
       produksi:                "Produksi (Kuintal)",
       harga_jual_petani:       "Harga jual petani (Rp/kg)",
     },
+    rangkuman: { produksiCol: "produksi", factor: 1 },
   },
 };
 
@@ -137,16 +148,11 @@ export const SPH_CONFIG = {
 // dengan isi kolom "nama_kab" di database Supabase, karena app.js
 // memfilter data pakai .eq("nama_kab", id) -- bukan pakai kode kabupaten.
 // Yang sudah dikonfirmasi lewat SQL: kab "01" -> nama_kab "Bangka".
-// Kota Pangkal Pinang dikonfirmasi di database ditulis "Kota Pangkal
-// Pinang" (DENGAN spasi antara "Pangkal" dan "Pinang") -- lihat tabel
-// data_sbs kolom nama_kab. Kalau data kabupaten lain mulai tersinkron
-// dari aplikasi desktop, jalankan ulang query berikut di Supabase SQL
-// Editor untuk memastikan:
+// 6 baris lainnya MASIH TEBAKAN pola yang sama (tanpa "Kab."/"Kota").
+// Begitu data kabupaten lain mulai tersinkron dari aplikasi desktop,
+// jalankan ulang query berikut di Supabase SQL Editor untuk memastikan:
 //   select distinct kab, nama_kab from data_sbs order by kab;
 // lalu cocokkan/perbaiki nilai "id" di bawah ini kalau ternyata beda.
-// JANGAN LUPA: kolom profiles.kab_id untuk user role "kabkot" juga WAJIB
-// sama persis dengan nilai "id" di bawah ini (lihat catatan di app.js
-// bagian siapkanKabSelect()).
 export const DAFTAR_KAB_BABEL = [
   { id: "Bangka", nama: "Kab. Bangka" },
   { id: "Belitung", nama: "Kab. Belitung" },
@@ -154,5 +160,5 @@ export const DAFTAR_KAB_BABEL = [
   { id: "Bangka Tengah", nama: "Kab. Bangka Tengah" },
   { id: "Bangka Selatan", nama: "Kab. Bangka Selatan" },
   { id: "Belitung Timur", nama: "Kab. Belitung Timur" },
-  { id: "Kota Pangkal Pinang", nama: "Kota Pangkal Pinang" },
+  { id: "Kota Pangkalpinang", nama: "Kota Pangkal Pinang" },
 ];

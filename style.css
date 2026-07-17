@@ -174,6 +174,15 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
   font-size: 11px; color: #888; font-style: italic; margin-top: 6px; line-height: 1.4;
 }
 
+/* ---------- Toggle Panel Kanan (Rekon / Rangkuman) ---------- */
+.panel-toggle { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.toggle-btn {
+  border: 1px solid var(--hijau-muda); background: var(--putih); color: var(--hijau-tua);
+  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;
+}
+.toggle-btn:hover:not(.aktif) { background: #eafaf1; }
+.toggle-btn.aktif { background: var(--hijau-tua); border-color: var(--hijau-tua); color: var(--putih); }
+
 /* ---------- Rekon ---------- */
 .rekon-slicer { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 10px; }
 .rekon-slicer .field { margin-bottom: 0; min-width: 150px; }
@@ -212,6 +221,11 @@ table.tabel-rekon td.outlier-rata { background: #fff176 !important; font-weight:
   text-align: center; color: #999; font-style: italic; padding: 40px 0;
 }
 
+/* ---------- Tabel Rangkuman ---------- */
+#rangkuman-area table.tabel-rekon th,
+#rangkuman-area table.tabel-rekon td { white-space: nowrap; }
+#rangkuman-area table.tabel-rekon td.nama { white-space: normal; min-width: 140px; }
+
 @media (max-width: 860px) {
   html, body { overflow: auto; }
   body { display: block; }
@@ -236,6 +250,8 @@ table.tabel-rekon td.outlier-rata { background: #fff176 !important; font-weight:
 
   .tab-bar { flex-wrap: wrap; }
   .tab-btn { padding: 6px 10px; font-size: 11px; }
+
+  .panel-toggle { flex-direction: column; }
 
   .tabel-judul { flex-direction: column; align-items: flex-start; gap: 2px; }
 

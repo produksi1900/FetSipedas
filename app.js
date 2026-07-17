@@ -93,6 +93,13 @@ function fmt(v, desimal = 2) {
   if (v === null || v === undefined || v === 0) return "-";
   return v.toLocaleString("id-ID", { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
 }
+function fmtPersen(v) {
+  if (v === null || v === undefined || !isFinite(v)) return "#DIV/0!";
+  return v.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function normalisasiNamaTanaman(n) {
+  return String(n ?? "").trim().toLowerCase();
+}
 
 // ============================================================
 // AUTH — login didok di panel kiri (bukan fullscreen)
@@ -102,7 +109,7 @@ function setLampuKoneksi(aktif) {
 }
 
 function bukaKunci(aktif) {
-  // Buka/kunci Section 2 (download) & Section 3 (rekon)
+  // Buka/kunci Section 2 (download) & Section 3 (rekon+rangkuman)
   $("panel-download").classList.toggle("terbuka", aktif);
   $("panel-rekon").classList.toggle("terbuka", aktif);
 }
@@ -176,13 +183,24 @@ async function masukKeApp() {
   // ---- Penomoran section Rekonsiliasi: geser jadi "3." utk kabkot
   // karena mereka tidak punya section 3 (Referensi ID Tanaman) ----
   $("label-rekon").textContent = profile.role === "prov"
-    ? "4. Rekonsiliasi Data"
-    : "3. Rekonsiliasi Data";
+    ? "4. Rekonsiliasi & Rangkuman Data"
+    : "3. Rekonsiliasi & Rangkuman Data";
+
+  // ---- Panel Rangkuman: siapkan pilihan tahun & kabupaten ----
+  isiPilihanTahun($("sel-tahun-rangkuman"));
+  $("sel-kab-rangkuman").innerHTML =
+    `<option value="semua">— Semua Kabupaten/Kota (Provinsi) —</option>` +
+    DAFTAR_KAB_BABEL.map((k) => `<option value="${k.id}">${k.nama}</option>`).join("");
 
   await muatReferensiIdTanaman();
   await siapkanKabSelect();
   await muatUlangJenis();
   await muatData(); // render otomatis begitu selesai login, tanpa perlu klik ulang dropdown
+
+  // Kalau lagi buka view Rangkuman (mis. sisa state sebelumnya), muat juga
+  if (!$("view-rangkuman").classList.contains("hidden")) {
+    await muatRangkuman();
+  }
 }
 
 function keluarDariApp() {
@@ -204,6 +222,10 @@ function keluarDariApp() {
 
   $("in-username").value = "";
   $("in-password").value = "";
+
+  // Reset panel kanan balik ke view Rekonsiliasi
+  gantiView("rekon");
+  $("rangkuman-area").innerHTML = `<div class="placeholder-kosong">Pilih jenis SPH, tahun & kabupaten untuk mulai.</div>`;
 }
 
 $("btn-login").addEventListener("click", login);
@@ -247,6 +269,20 @@ $("btn-logout").addEventListener("click", async () => {
   await supabase.auth.signOut();
   keluarDariApp();
 });
+
+// ============================================================
+// TOGGLE PANEL KANAN: Rekonsiliasi <-> Rangkuman
+// ============================================================
+function gantiView(view) {
+  const keRekon = view === "rekon";
+  $("view-rekon").classList.toggle("hidden", !keRekon);
+  $("view-rangkuman").classList.toggle("hidden", keRekon);
+  $("btn-view-rekon").classList.toggle("aktif", keRekon);
+  $("btn-view-rangkuman").classList.toggle("aktif", !keRekon);
+  if (!keRekon && state.profile) muatRangkuman();
+}
+$("btn-view-rekon").addEventListener("click", () => gantiView("rekon"));
+$("btn-view-rangkuman").addEventListener("click", () => gantiView("rangkuman"));
 
 // ============================================================
 // PANEL KIRI: DOWNLOAD DATA (baca dari database, export ke Excel)
@@ -383,7 +419,7 @@ async function muatInfoTerakhir() {
 }
 
 // ============================================================
-// PANEL KANAN: REKON
+// PANEL KANAN — VIEW: REKON
 // ============================================================
 $("sel-jenis").addEventListener("change", muatUlangJenis);
 $("sel-tahun-rekon").addEventListener("change", async () => { await muatInfoTerakhir(); await siapkanKabSelect(); await muatData(); });
@@ -485,10 +521,6 @@ async function siapkanKomoditiSelect() {
   selKom.innerHTML = unik.length
     ? unik.map((n) => `<option value="${n}">${n}</option>`).join("")
     : `<option value="">(tidak ada komoditi)</option>`;
-}
-
-function normalisasiNamaTanaman(n) {
-  return String(n ?? "").trim().toLowerCase();
 }
 
 // ============================================================
@@ -886,6 +918,217 @@ function renderRekon(cfg, rowsKab, rowsSemua, komoditi) {
     DAFTAR_KAB_BABEL.map((kab) => ({ label: kab.nama, data: perKabAvg[kab.id] })),
     tab.satuan
   );
+}
+
+// ============================================================
+// PANEL KANAN — VIEW: RANGKUMAN DATA
+// ============================================================
+// Total produksi per komoditi (dijumlah dari semua kecamatan, dan
+// dijumlah dari semua kabupaten kalau dropdown Kabupaten = "semua"),
+// dipecah per bulan (khusus SBS) & triwulan, plus growth q-to-q dan
+// y-on-y. Growth dihitung dari "triwulan terakhir yang ada datanya":
+//   - q-to-q = (TW ini - TW sebelumnya) / TW sebelumnya
+//     (kalau TW ini = TW1, "TW sebelumnya" = TW4 tahun lalu)
+//   - y-on-y = (TW ini - TW yang sama tahun lalu) / TW yang sama tahun lalu
+// Makanya data tahun SEBELUMNYA juga selalu di-fetch di sini.
+const BULAN_NAMA = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+];
+
+$("sel-jenis-rangkuman").addEventListener("change", muatRangkuman);
+$("sel-tahun-rangkuman").addEventListener("change", muatRangkuman);
+$("sel-kab-rangkuman").addEventListener("change", muatRangkuman);
+
+async function muatRangkuman() {
+  if (!state.profile) return;
+  const jenis = $("sel-jenis-rangkuman").value;
+  const cfg = SPH_CONFIG[jenis];
+  const rc = cfg.rangkuman;
+  const tahun = Number($("sel-tahun-rangkuman").value);
+  const kabPilihan = $("sel-kab-rangkuman").value; // "semua" atau nama_kab
+  const area = $("rangkuman-area");
+
+  if (!rc) {
+    area.innerHTML = `<div class="placeholder-kosong">Jenis SPH ini belum didukung untuk Rangkuman Data.</div>`;
+    return;
+  }
+
+  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
+
+  const ambilTahun = (thn) =>
+    fetchAllRows((from, to) => {
+      let q = supabase
+        .from(cfg.table)
+        .select(`namatanaman, idtanaman, ${cfg.periodeCol}, ${rc.produksiCol}`)
+        .eq("tahun", thn);
+      if (kabPilihan !== "semua") q = q.eq("nama_kab", kabPilihan);
+      return q.range(from, to);
+    });
+
+  let rowsIni = [], rowsLalu = [];
+  try {
+    [rowsIni, rowsLalu] = await Promise.all([ambilTahun(tahun), ambilTahun(tahun - 1)]);
+  } catch (e) {
+    area.innerHTML = `<div class="placeholder-kosong">Gagal memuat data: ${e.message}</div>`;
+    return;
+  }
+
+  renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan);
+}
+
+// Agregasi baris mentah -> Map<namatanaman, {idtanaman, bulan:{1..12}, tw:{1..4}}>
+function agregasiRangkuman(cfg, rc, rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const nama = r.namatanaman;
+    if (!nama) continue;
+    if (!map.has(nama)) map.set(nama, { idtanaman: r.idtanaman ?? "", bulan: {}, tw: { 1: 0, 2: 0, 3: 0, 4: 0 } });
+    const obj = map.get(nama);
+    if (!obj.idtanaman && r.idtanaman) obj.idtanaman = r.idtanaman;
+
+    const nilai = (Number(r[rc.produksiCol]) || 0) * (rc.factor ?? 1);
+
+    if (cfg.periodeCol === "bulan") {
+      const b = Number(r.bulan);
+      if (b >= 1 && b <= 12) {
+        obj.bulan[b] = (obj.bulan[b] || 0) + nilai;
+        const tw = Math.ceil(b / 3);
+        obj.tw[tw] = (obj.tw[tw] || 0) + nilai;
+      }
+    } else {
+      const tw = Number(r.triwulan);
+      if (tw >= 1 && tw <= 4) obj.tw[tw] = (obj.tw[tw] || 0) + nilai;
+    }
+  }
+  return map;
+}
+
+// Cari indeks triwulan terakhir (1-4) yang punya nilai != 0
+function twTerakhirAdaData(twObj) {
+  for (let t = 4; t >= 1; t--) {
+    if ((twObj[t] || 0) !== 0) return t;
+  }
+  return null;
+}
+
+// q-to-q & y-on-y dalam persen (null kalau pembanding = 0 -> #DIV/0!)
+function hitungGrowth(valNow, valPrevQ, valYoy) {
+  const qtoq = valPrevQ !== 0 ? ((valNow - valPrevQ) / valPrevQ) * 100 : null;
+  const yoy = valYoy !== 0 ? ((valNow - valYoy) / valYoy) * 100 : null;
+  return { qtoq, yoy };
+}
+
+function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
+  const area = $("rangkuman-area");
+  const mapIni = agregasiRangkuman(cfg, rc, rowsIni);
+  const mapLalu = agregasiRangkuman(cfg, rc, rowsLalu);
+
+  if (mapIni.size === 0) {
+    area.innerHTML =
+      `<div class="placeholder-kosong">Tidak ada data ${cfg.label} tahun ${tahun}` +
+      `${kabPilihan === "semua" ? "" : " untuk " + kabPilihan}.</div>`;
+    return;
+  }
+
+  // Urutkan komoditi sesuai referensi id_tanaman (sama seperti dropdown Rekon)
+  const urutanMap = state.idTanamanUrutan[jenis] || {};
+  const namaList = Array.from(mapIni.keys()).sort((a, b) => {
+    const ua = urutanMap[normalisasiNamaTanaman(a)];
+    const ub = urutanMap[normalisasiNamaTanaman(b)];
+    if (ua !== undefined && ub !== undefined) return ua - ub;
+    if (ua !== undefined) return -1;
+    if (ub !== undefined) return 1;
+    return a.localeCompare(b, "id");
+  });
+
+  const pakaiBulan = cfg.periodeCol === "bulan";
+  const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabPilihan);
+  const labelKab = kabPilihan === "semua" ? "Semua Kabupaten/Kota (Provinsi)" : (kabEntry ? kabEntry.nama : kabPilihan);
+
+  let kolomHead = `<th>Kode</th><th>Nama</th><th>Satuan</th>`;
+  if (pakaiBulan) kolomHead += BULAN_NAMA.map((b) => `<th>${b}</th>`).join("");
+  kolomHead += `<th>TW 1</th><th>TW 2</th><th>TW 3</th><th>TW 4</th><th>Jumlah</th><th>q-to-q</th><th>y-on-y</th>`;
+
+  const totalBulan = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+  const totalTw = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const totalTwLalu = { 1: 0, 2: 0, 3: 0, 4: 0 };
+
+  let bodyRows = "";
+  namaList.forEach((nama) => {
+    const d = mapIni.get(nama);
+    const dLalu = mapLalu.get(nama) || { tw: { 1: 0, 2: 0, 3: 0, 4: 0 }, bulan: {} };
+
+    const jumlah = (d.tw[1] || 0) + (d.tw[2] || 0) + (d.tw[3] || 0) + (d.tw[4] || 0);
+    const twNow = twTerakhirAdaData(d.tw);
+
+    let qtoq = null, yoy = null;
+    if (twNow !== null) {
+      const valNow = d.tw[twNow] || 0;
+      const valPrevQ = twNow === 1 ? (dLalu.tw[4] || 0) : (d.tw[twNow - 1] || 0);
+      const valYoy = dLalu.tw[twNow] || 0;
+      ({ qtoq, yoy } = hitungGrowth(valNow, valPrevQ, valYoy));
+    }
+
+    let tds = `<td>${d.idtanaman || "-"}</td><td class="nama">${nama}</td><td>Kuintal</td>`;
+    if (pakaiBulan) {
+      for (let b = 1; b <= 12; b++) {
+        const v = d.bulan[b] || 0;
+        tds += `<td>${fmt(v, 2)}</td>`;
+        totalBulan[b] += v;
+      }
+    }
+    for (let t = 1; t <= 4; t++) {
+      const v = d.tw[t] || 0;
+      tds += `<td>${fmt(v, 2)}</td>`;
+      totalTw[t] += v;
+    }
+    for (let t = 1; t <= 4; t++) totalTwLalu[t] += (dLalu.tw[t] || 0);
+
+    tds += `<td>${fmt(jumlah, 2)}</td>`;
+    tds += `<td>${fmtPersen(qtoq)}</td>`;
+    tds += `<td>${fmtPersen(yoy)}</td>`;
+
+    bodyRows += `<tr>${tds}</tr>`;
+  });
+
+  // ---- Baris TOTAL ----
+  const jumlahTotal = totalTw[1] + totalTw[2] + totalTw[3] + totalTw[4];
+  const twNowTotal = twTerakhirAdaData(totalTw);
+  let qtoqTotal = null, yoyTotal = null;
+  if (twNowTotal !== null) {
+    const valNow = totalTw[twNowTotal];
+    const valPrevQ = twNowTotal === 1 ? totalTwLalu[4] : totalTw[twNowTotal - 1];
+    const valYoy = totalTwLalu[twNowTotal];
+    ({ qtoq: qtoqTotal, yoy: yoyTotal } = hitungGrowth(valNow, valPrevQ, valYoy));
+  }
+
+  let tdsTotal = `<td></td><td class="nama"><strong>TOTAL</strong></td><td></td>`;
+  if (pakaiBulan) {
+    for (let b = 1; b <= 12; b++) tdsTotal += `<td><strong>${fmt(totalBulan[b], 2)}</strong></td>`;
+  }
+  for (let t = 1; t <= 4; t++) tdsTotal += `<td><strong>${fmt(totalTw[t], 2)}</strong></td>`;
+  tdsTotal += `<td><strong>${fmt(jumlahTotal, 2)}</strong></td>`;
+  tdsTotal += `<td><strong>${fmtPersen(qtoqTotal)}</strong></td>`;
+  tdsTotal += `<td><strong>${fmtPersen(yoyTotal)}</strong></td>`;
+
+  area.innerHTML = `
+    <div class="tabel-blok">
+      <div class="tabel-judul">
+        <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
+        <span class="satuan">Satuan: Kuintal · q-to-q &amp; y-on-y dalam %</span>
+      </div>
+      <table class="tabel-rekon">
+        <thead><tr>${kolomHead}</tr></thead>
+        <tbody>${bodyRows}<tr>${tdsTotal}</tr></tbody>
+      </table>
+    </div>
+    <div class="catatan-kecil" style="margin-top:8px;">
+      q-to-q &amp; y-on-y dihitung dari triwulan terakhir yang ada datanya di tahun ${tahun}
+      (butuh data TW4 &amp; TW yang sama tahun ${tahun - 1}, sudah otomatis diambil).
+      "#DIV/0!" muncul kalau data pembandingnya kosong/nol.
+    </div>
+  `;
 }
 
 // ============================================================
