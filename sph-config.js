@@ -14,9 +14,10 @@
 // `rangkuman` = konfigurasi utk Panel "Rangkuman Data" (total produksi
 // per komoditi per bulan/triwulan se-kabupaten/provinsi, dgn growth
 // q-to-q & y-on-y). produksiCol = kolom DB yang dipakai sbg nilai
-// produksi, factor = pengali supaya hasilnya dalam satuan Kuintal
-// (kolom produksi_habis/produksi_belum_habis di DB disimpan dalam Kg,
-// jadi factor 0.01; khusus BST kolom "produksi" sudah dalam Kuintal).
+// produksi, factor = pengali supaya hasilnya dalam satuan Kuintal.
+// Kolom produksi_habis di DB sudah dalam Kuintal (sama seperti raw
+// Excel di aplikasi desktop), jadi factor = 1 untuk SBS/TBF/TH.
+// BST juga factor = 1 (kolom "produksi" sudah Kuintal).
 
 export const SPH_CONFIG = {
   sbs: {
@@ -50,7 +51,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
   },
   tbf: {
     label: "SPH-TBF",
@@ -80,7 +81,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
   },
   th: {
     label: "SPH-TH",
@@ -108,7 +109,7 @@ export const SPH_CONFIG = {
       produksi_habis:     "Produksi Habis (Kg)",
       harga_jual_petani:  "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 0.01 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
   },
   bst: {
     label: "SPH-BST",

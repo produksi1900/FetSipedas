@@ -94,8 +94,22 @@ function fmt(v, desimal = 2) {
   return v.toLocaleString("id-ID", { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
 }
 function fmtPersen(v) {
-  if (v === null || v === undefined || !isFinite(v)) return "#DIV/0!";
+  if (v === null || v === undefined || !isFinite(v)) return "-";
   return v.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Kembalikan HTML <span> berwarna untuk nilai growth (persen).
+// null -> "-" (strip), positif -> hijau, negatif -> merah, nol -> hitam biasa.
+function fmtGrowthHtml(v, bold = false) {
+  if (v === null || v === undefined || !isFinite(v)) {
+    return bold ? `<strong>-</strong>` : `-`;
+  }
+  const teks = fmtPersen(v);
+  let warna = "";
+  if (v > 0) warna = `color:var(--hijau-muda);`;
+  else if (v < 0) warna = `color:var(--merah);`;
+  const inner = bold ? `<strong>${teks}</strong>` : teks;
+  return warna ? `<span style="${warna}">${inner}</span>` : inner;
 }
 function normalisasiNamaTanaman(n) {
   return String(n ?? "").trim().toLowerCase();
@@ -1012,11 +1026,23 @@ function twTerakhirAdaData(twObj) {
   return null;
 }
 
-// q-to-q & y-on-y dalam persen (null kalau pembanding = 0 -> #DIV/0!)
-function hitungGrowth(valNow, valPrevQ, valYoy) {
-  const qtoq = valPrevQ !== 0 ? ((valNow - valPrevQ) / valPrevQ) * 100 : null;
-  const yoy = valYoy !== 0 ? ((valNow - valYoy) / valYoy) * 100 : null;
-  return { qtoq, yoy };
+// Hitung satu nilai growth (persen):
+//   - pembilang ada, penyebut ada  -> rumus normal
+//   - pembilang ada, penyebut = 0  -> +100 (naik dari nol)
+//   - pembilang = 0, penyebut ada  -> -100 (turun ke nol)
+//   - keduanya = 0                 -> null (tampil sebagai strip "-")
+function hitungSatuGrowth(valNow, valBase) {
+  if (valBase !== 0) return ((valNow - valBase) / valBase) * 100;
+  if (valNow !== 0) return 100;
+  return null; // 0/0 -> strip
+}
+
+// q-to-q, y-on-y, dan c-to-c (kumulatif vs kumulatif tahun lalu) dalam persen
+function hitungGrowth(valNow, valPrevQ, valYoy, kumulIni, kumulLalu) {
+  const qtoq  = hitungSatuGrowth(valNow,   valPrevQ);
+  const yoy   = hitungSatuGrowth(valNow,   valYoy);
+  const ctoc  = hitungSatuGrowth(kumulIni, kumulLalu);
+  return { qtoq, yoy, ctoc };
 }
 
 function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
@@ -1048,11 +1074,12 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
 
   let kolomHead = `<th>Kode</th><th>Nama</th><th>Satuan</th>`;
   if (pakaiBulan) kolomHead += BULAN_NAMA.map((b) => `<th>${b}</th>`).join("");
-  kolomHead += `<th>TW 1</th><th>TW 2</th><th>TW 3</th><th>TW 4</th><th>Jumlah</th><th>q-to-q</th><th>y-on-y</th>`;
+  kolomHead += `<th>TW 1</th><th>TW 2</th><th>TW 3</th><th>TW 4</th><th>Jumlah</th><th>q-to-q</th><th>y-on-y</th><th>c-to-c</th>`;
 
   const totalBulan = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
   const totalTw = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const totalTwLalu = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  let totalKumulIni = 0, totalKumulLalu = 0;
 
   let bodyRows = "";
   namaList.forEach((nama) => {
@@ -1060,14 +1087,24 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
     const dLalu = mapLalu.get(nama) || { tw: { 1: 0, 2: 0, 3: 0, 4: 0 }, bulan: {} };
 
     const jumlah = (d.tw[1] || 0) + (d.tw[2] || 0) + (d.tw[3] || 0) + (d.tw[4] || 0);
+    const jumlahLalu = (dLalu.tw[1] || 0) + (dLalu.tw[2] || 0) + (dLalu.tw[3] || 0) + (dLalu.tw[4] || 0);
     const twNow = twTerakhirAdaData(d.tw);
 
-    let qtoq = null, yoy = null;
+    // Kumulatif s.d. twNow (untuk c-to-c yang apple-to-apple)
+    let kumulIni = 0, kumulLalu = 0;
+    if (twNow !== null) {
+      for (let t = 1; t <= twNow; t++) {
+        kumulIni  += d.tw[t]    || 0;
+        kumulLalu += dLalu.tw[t] || 0;
+      }
+    }
+
+    let qtoq = null, yoy = null, ctoc = null;
     if (twNow !== null) {
       const valNow = d.tw[twNow] || 0;
       const valPrevQ = twNow === 1 ? (dLalu.tw[4] || 0) : (d.tw[twNow - 1] || 0);
       const valYoy = dLalu.tw[twNow] || 0;
-      ({ qtoq, yoy } = hitungGrowth(valNow, valPrevQ, valYoy));
+      ({ qtoq, yoy, ctoc } = hitungGrowth(valNow, valPrevQ, valYoy, kumulIni, kumulLalu));
     }
 
     let tds = `<td>${d.idtanaman || "-"}</td><td class="nama">${nama}</td><td>Kuintal</td>`;
@@ -1084,10 +1121,13 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
       totalTw[t] += v;
     }
     for (let t = 1; t <= 4; t++) totalTwLalu[t] += (dLalu.tw[t] || 0);
+    totalKumulIni  += kumulIni;
+    totalKumulLalu += kumulLalu;
 
     tds += `<td>${fmt(jumlah, 2)}</td>`;
-    tds += `<td>${fmtPersen(qtoq)}</td>`;
-    tds += `<td>${fmtPersen(yoy)}</td>`;
+    tds += `<td>${fmtGrowthHtml(qtoq)}</td>`;
+    tds += `<td>${fmtGrowthHtml(yoy)}</td>`;
+    tds += `<td>${fmtGrowthHtml(ctoc)}</td>`;
 
     bodyRows += `<tr>${tds}</tr>`;
   });
@@ -1095,12 +1135,13 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
   // ---- Baris TOTAL ----
   const jumlahTotal = totalTw[1] + totalTw[2] + totalTw[3] + totalTw[4];
   const twNowTotal = twTerakhirAdaData(totalTw);
-  let qtoqTotal = null, yoyTotal = null;
+  let qtoqTotal = null, yoyTotal = null, ctocTotal = null;
   if (twNowTotal !== null) {
     const valNow = totalTw[twNowTotal];
     const valPrevQ = twNowTotal === 1 ? totalTwLalu[4] : totalTw[twNowTotal - 1];
     const valYoy = totalTwLalu[twNowTotal];
-    ({ qtoq: qtoqTotal, yoy: yoyTotal } = hitungGrowth(valNow, valPrevQ, valYoy));
+    ({ qtoq: qtoqTotal, yoy: yoyTotal, ctoc: ctocTotal } =
+      hitungGrowth(valNow, valPrevQ, valYoy, totalKumulIni, totalKumulLalu));
   }
 
   let tdsTotal = `<td></td><td class="nama"><strong>TOTAL</strong></td><td></td>`;
@@ -1109,14 +1150,15 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
   }
   for (let t = 1; t <= 4; t++) tdsTotal += `<td><strong>${fmt(totalTw[t], 2)}</strong></td>`;
   tdsTotal += `<td><strong>${fmt(jumlahTotal, 2)}</strong></td>`;
-  tdsTotal += `<td><strong>${fmtPersen(qtoqTotal)}</strong></td>`;
-  tdsTotal += `<td><strong>${fmtPersen(yoyTotal)}</strong></td>`;
+  tdsTotal += `<td>${fmtGrowthHtml(qtoqTotal, true)}</td>`;
+  tdsTotal += `<td>${fmtGrowthHtml(yoyTotal, true)}</td>`;
+  tdsTotal += `<td>${fmtGrowthHtml(ctocTotal, true)}</td>`;
 
   area.innerHTML = `
     <div class="tabel-blok">
       <div class="tabel-judul">
         <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
-        <span class="satuan">Satuan: Kuintal · q-to-q &amp; y-on-y dalam %</span>
+        <span class="satuan">Satuan: Kuintal · q-to-q, y-on-y &amp; c-to-c dalam %</span>
       </div>
       <table class="tabel-rekon">
         <thead><tr>${kolomHead}</tr></thead>
@@ -1124,9 +1166,10 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
       </table>
     </div>
     <div class="catatan-kecil" style="margin-top:8px;">
-      q-to-q &amp; y-on-y dihitung dari triwulan terakhir yang ada datanya di tahun ${tahun}
-      (butuh data TW4 &amp; TW yang sama tahun ${tahun - 1}, sudah otomatis diambil).
-      "#DIV/0!" muncul kalau data pembandingnya kosong/nol.
+      q-to-q &amp; y-on-y: dihitung dari triwulan terakhir yang ada datanya di tahun ${tahun}.
+      c-to-c: kumulatif s.d. TW terakhir tahun ${tahun} vs kumulatif s.d. TW yang sama tahun ${tahun - 1}.
+      Nilai "-" muncul kalau pembilang &amp; penyebut keduanya nol.
+      Jika hanya salah satu yang nol: +100% atau −100%.
     </div>
   `;
 }
