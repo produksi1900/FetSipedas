@@ -733,10 +733,20 @@ function buatTabelKecPeriode({ judul, satuan, kecRows, matrix, nPeriode, headerL
 
   const blok = document.createElement("div");
   blok.className = "tabel-blok";
+
+  const scrollAtas = document.createElement("div");
+  scrollAtas.className = "scroll-atas";
+  scrollAtas.innerHTML = `<div class="scroll-atas-dummy"></div>`;
+  blok.appendChild(scrollAtas);
+
+  const tabelScroll = document.createElement("div");
+  tabelScroll.className = "tabel-scroll";
+  blok.appendChild(tabelScroll);
+
   const konten = document.createElement("div");
   konten.className = "tabel-konten";
   konten.innerHTML = `<div class="tabel-judul"><span>${judul}</span><span class="satuan">${satuan}</span></div>`;
-  blok.appendChild(konten);
+  tabelScroll.appendChild(konten);
 
   const table = document.createElement("table");
   table.className = "tabel-rekon";
@@ -775,10 +785,20 @@ function buatTabelRata2PerKab({ judul, tab, cfg, rowsSemua, nPeriode, headerLabe
   const labelAxis = cfg.periodeCol === "triwulan" ? "Triwulan" : "Bulan";
   const blok = document.createElement("div");
   blok.className = "tabel-blok";
+
+  const scrollAtas = document.createElement("div");
+  scrollAtas.className = "scroll-atas";
+  scrollAtas.innerHTML = `<div class="scroll-atas-dummy"></div>`;
+  blok.appendChild(scrollAtas);
+
+  const tabelScroll = document.createElement("div");
+  tabelScroll.className = "tabel-scroll";
+  blok.appendChild(tabelScroll);
+
   const konten = document.createElement("div");
   konten.className = "tabel-konten";
   konten.innerHTML = `<div class="tabel-judul"><span>Rata-Rata ${judul} menurut Kabupaten &amp; ${labelAxis}</span></div>`;
-  blok.appendChild(konten);
+  tabelScroll.appendChild(konten);
 
   const table = document.createElement("table");
   table.className = "tabel-rekon tabel-rata2";
@@ -941,6 +961,24 @@ function renderRekon(cfg, rowsKab, rowsSemua, komoditi) {
     DAFTAR_KAB_BABEL.map((kab) => ({ label: kab.nama, data: perKabAvg[kab.id] })),
     tab.satuan
   );
+
+  initScrollAtas(area);
+}
+
+// Sinkronkan scrollbar tipis di ATAS tiap tabel dengan area scroll asli
+// tabel itu (.tabel-scroll), supaya user bisa scroll ke kanan tanpa harus
+// scroll ke bawah dulu buat cari scrollbar di bawah tabel yang panjang.
+function initScrollAtas(container) {
+  container.querySelectorAll(".tabel-blok").forEach((blok) => {
+    const atas = blok.querySelector(".scroll-atas");
+    const dummy = blok.querySelector(".scroll-atas-dummy");
+    const scroll = blok.querySelector(".tabel-scroll");
+    if (!atas || !dummy || !scroll || atas.dataset.terpasang) return;
+    atas.dataset.terpasang = "1";
+    dummy.style.width = scroll.scrollWidth + "px";
+    atas.addEventListener("scroll", () => { scroll.scrollLeft = atas.scrollLeft; });
+    scroll.addEventListener("scroll", () => { atas.scrollLeft = scroll.scrollLeft; });
+  });
 }
 
 // ============================================================
@@ -1166,15 +1204,18 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
 
   area.innerHTML = `
     <div class="tabel-blok">
-      <div class="tabel-konten">
-        <div class="tabel-judul">
-          <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
-          <span class="satuan">Satuan: ${rc.satuan} · q-to-q, y-on-y &amp; c-to-c dalam %</span>
+      <div class="scroll-atas"><div class="scroll-atas-dummy"></div></div>
+      <div class="tabel-scroll">
+        <div class="tabel-konten">
+          <div class="tabel-judul">
+            <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
+            <span class="satuan">Satuan: ${rc.satuan} · q-to-q, y-on-y &amp; c-to-c dalam %</span>
+          </div>
+          <table class="tabel-rekon tabel-rangkuman">
+            <thead><tr>${kolomHead}</tr></thead>
+            <tbody>${bodyRows}<tr>${tdsTotal}</tr></tbody>
+          </table>
         </div>
-        <table class="tabel-rekon">
-          <thead><tr>${kolomHead}</tr></thead>
-          <tbody>${bodyRows}<tr>${tdsTotal}</tr></tbody>
-        </table>
       </div>
     </div>
     <div class="catatan-kecil" style="margin-top:8px;">
@@ -1184,6 +1225,8 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
       Jika hanya salah satu yang nol: +100% atau −100%.
     </div>
   `;
+
+  initScrollAtas(area);
 }
 
 // ============================================================

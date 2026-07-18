@@ -197,6 +197,17 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 
 .tabel-blok { margin-bottom: 20px; background: var(--putih); border-radius: 6px; overflow: hidden; border: 1px solid #e0e0e0; }
 
+/* Scrollbar tipis DI ATAS tabel, disinkronkan (lewat JS) dengan scroll
+   asli tabel (.tabel-scroll) -- supaya bisa scroll ke kanan tanpa harus
+   scroll ke bawah dulu buat cari scrollbar di ujung tabel yang panjang. */
+.scroll-atas {
+  overflow-x: auto; overflow-y: hidden; height: 14px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.scroll-atas-dummy { height: 1px; }
+
+.tabel-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+
 /* .tabel-konten membungkus judul+tabel supaya lebarnya SAMA dgn lebar asli
    tabel (termasuk bagian yg baru kelihatan setelah discroll ke kanan).
    Trik: inline-block otomatis melebar mengikuti anak terlebarnya (tabel),
@@ -218,7 +229,6 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
   position: sticky; right: 10px; white-space: nowrap;
 }
 
-.tabel-blok { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table.tabel-rekon {
   border-collapse: collapse; width: 100%; font-size: 12px; min-width: 600px;
 }
@@ -271,7 +281,31 @@ table.tabel-rekon td.outlier-rata { background: #fff176 !important; font-weight:
 /* ---------- Tabel Rangkuman ---------- */
 #rangkuman-area table.tabel-rekon th,
 #rangkuman-area table.tabel-rekon td { white-space: nowrap; }
-#rangkuman-area table.tabel-rekon td.nama { white-space: normal; min-width: 140px; }
+#rangkuman-area table.tabel-rekon td.nama { white-space: normal; }
+
+/* Freeze 3 kolom pertama (Kode, Nama, Satuan) saat discroll ke kanan --
+   lebar dikunci per kolom supaya offset "left" sticky-nya presisi. */
+#rangkuman-area table.tabel-rekon th:nth-child(1),
+#rangkuman-area table.tabel-rekon td:nth-child(1) {
+  position: sticky; left: 0; z-index: 2;
+  width: 95px; min-width: 95px; max-width: 95px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+#rangkuman-area table.tabel-rekon th:nth-child(2),
+#rangkuman-area table.tabel-rekon td:nth-child(2) {
+  position: sticky; left: 95px; z-index: 2;
+  width: 170px; min-width: 170px; max-width: 170px;
+}
+#rangkuman-area table.tabel-rekon th:nth-child(3),
+#rangkuman-area table.tabel-rekon td:nth-child(3) {
+  position: sticky; left: 265px; z-index: 2;
+  width: 70px; min-width: 70px; max-width: 70px;
+  overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 3px 0 6px -3px rgba(0,0,0,0.35); /* penanda batas area freeze */
+}
+/* Header (baris judul kolom) tetap kelihatan di atas cell body yang lewat
+   di baliknya saat scroll -- z-index lebih tinggi drpd sel body biasa. */
+#rangkuman-area table.tabel-rekon th:nth-child(-n+3) { z-index: 3; }
 
 @media (max-width: 860px) {
   html, body { overflow: auto; }
