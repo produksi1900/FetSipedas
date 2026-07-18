@@ -244,10 +244,17 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
    sebelahnya tetap sebaris walau di zoom 100%, bukan kepental ke baris
    baru. Field tombol sendiri sudah punya style="min-width:0" inline di
    index.html jadi tidak ikut aturan lebar minimum di sini. */
-.rekon-slicer .field { margin-bottom: 0; min-width: 108px; flex: 1 1 108px; }
+.rekon-slicer .field { margin-bottom: 0; min-width: 0; flex: 1 1 108px; }
 .rekon-slicer .field select,
 .rekon-slicer .field input {
   padding: 5px 6px; font-size: 12px;
+}
+/* Tombol "Download Rangkuman Excel" ikut menyusut kalau ruangnya sempit
+   (bukan white-space:nowrap lagi -- lihat index.html), teksnya boleh
+   wrap jadi 2 baris supaya tetap sebaris dgn 3 dropdown & tidak
+   meluber/terpotong keluar layar. */
+.rekon-slicer .field button.btn-login {
+  padding: 6px 10px; font-size: 12px; line-height: 1.3;
 }
 
 .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; flex-shrink: 0; }
