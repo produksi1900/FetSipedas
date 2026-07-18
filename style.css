@@ -230,16 +230,22 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 }
 
 table.tabel-rekon {
-  border-collapse: collapse; width: 100%; font-size: 12px; min-width: 600px;
+  /* border-collapse:collapse dipakai sebelumnya, tapi kombinasinya dgn
+     position:sticky (kolom freeze di Rangkuman) punya bug klasik di
+     browser: border yang di-collapse "menembus" background sel sticky,
+     jadi kelihatan transparan/numpuk teks. Pakai border-collapse:separate
+     supaya tiap sel benar-benar solid & tidak tembus pandang. */
+  border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; min-width: 600px;
 }
 table.tabel-rekon th, table.tabel-rekon td {
   border: 1px solid #ddd; padding: 4px 6px; text-align: center;
+  background-color: var(--putih); /* eksplisit solid, bukan transparan */
 }
-table.tabel-rekon th { background: var(--hijau-muda); color: var(--putih); }
+table.tabel-rekon th { background-color: var(--hijau-muda); color: var(--putih); }
 table.tabel-rekon td.nama { text-align: left; }
-table.tabel-rekon tr:nth-child(even) td { background: #f8f8f8; }
-table.tabel-rekon td.outlier { background: #fff176 !important; font-weight: bold; }
-table.tabel-rekon td.outlier-rata { background: #fff176 !important; font-weight: bold; }
+table.tabel-rekon tr:nth-child(even) td { background-color: #f8f8f8; }
+table.tabel-rekon td.outlier { background-color: #fff176 !important; font-weight: bold; }
+table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-weight: bold; }
 
 /* ---------- Perataan kolom KHUSUS panel Rekonsiliasi (#rekon-area) ----------
    Tidak berlaku di Rangkuman Data (#rangkuman-area) supaya tabel itu tetap
