@@ -15,6 +15,7 @@ html, body {
   margin: 0; padding: 0;
   height: 100%;
   font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 15px; /* base sedikit digedein dari default browser (biasanya 16px tp banyak elemen pakai px kecil di bawah, jadi ini cuma fallback) */
   background: var(--abu);
   color: var(--teks-gelap);
   overflow: hidden; /* halaman utama TIDAK discroll, cuma panel rekon */
@@ -56,21 +57,21 @@ body { display: flex; flex-direction: column; }
   gap: 8px;
 }
 .logo-header { width: 24px; height: 24px; object-fit: contain; }
-.header .judul { font-weight: bold; font-size: 15px; }
-.header .subjudul { font-size: 11px; color: var(--kuning); margin-left: 4px; }
+.header .judul { font-weight: bold; font-size: 17px; }
+.header .subjudul { font-size: 12px; color: var(--kuning); margin-left: 4px; }
 .header .spacer { flex: 1; }
-.header .user-info { font-size: 12px; margin-right: 10px; }
+.header .user-info { font-size: 13px; margin-right: 10px; }
 .header button.logout {
   background: transparent; border: 1px solid var(--putih); color: var(--putih);
-  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;
 }
 .header button.logout:hover { background: rgba(255,255,255,0.15); }
 
 /* ---------- Info bar ---------- */
 .info-bar {
   background: var(--abu2);
-  padding: 5px 16px; flex-shrink: 0;
-  font-size: 12px;
+  padding: 6px 16px; flex-shrink: 0;
+  font-size: 13px;
   color: #555;
   border-bottom: 1px solid #ddd;
 }
@@ -91,29 +92,29 @@ body { display: flex; flex-direction: column; }
 .lampu-koneksi.aktif {
   background: var(--hijau-muda); border-color: var(--hijau-tua);
 }
-.status-koneksi { font-size: 11px; font-style: italic; color: #888; }
+.status-koneksi { font-size: 12px; font-style: italic; color: #888; }
 .status-koneksi.error { color: var(--merah); }
 
 #blok-login .field { margin-bottom: 8px; }
-#blok-login label { display: block; font-size: 12px; margin-bottom: 3px; color: #444; }
+#blok-login label { display: block; font-size: 13px; margin-bottom: 3px; color: #444; }
 #blok-login input[type=text], #blok-login input[type=password] {
-  width: 100%; padding: 6px 9px; font-size: 13px;
+  width: 100%; padding: 7px 9px; font-size: 14px;
   border: 1px solid #ccc; border-radius: 5px;
 }
 #blok-login input:focus { outline: none; border-color: var(--hijau-muda); }
-.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 4px 0 8px; color: #666; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0 8px; color: #666; }
 button.btn-login {
-  width: 100%; padding: 8px; border: none; border-radius: 6px;
-  background: var(--hijau-muda); color: var(--putih); font-weight: bold; font-size: 13px;
+  width: 100%; padding: 9px; border: none; border-radius: 6px;
+  background: var(--hijau-muda); color: var(--putih); font-weight: bold; font-size: 14px;
   cursor: pointer;
 }
 button.btn-login:hover { background: var(--hijau-tua); }
 button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor: not-allowed; }
-.pesan-error { color: var(--merah); font-size: 12px; margin-top: 6px; min-height: 14px; }
+.pesan-error { color: var(--merah); font-size: 13px; margin-top: 6px; min-height: 14px; }
 
 .info-connected {
   background: #eafaf1; border: 1px solid var(--hijau-muda); border-radius: 6px;
-  padding: 9px; font-size: 13px; color: var(--hijau-tua); line-height: 1.5;
+  padding: 9px; font-size: 14px; color: var(--hijau-tua); line-height: 1.5;
 }
 
 .divider { height: 1px; background: #dddddd; margin: 12px 0; }
@@ -132,13 +133,13 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .overlay-terkunci {
   position: absolute; inset: 0; z-index: 5;
   display: flex; align-items: center; justify-content: center;
-  text-align: center; font-size: 13px; color: #999; font-style: italic;
+  text-align: center; font-size: 14px; color: #999; font-style: italic;
   padding: 20px;
 }
 .blok-terkunci.terbuka .overlay-terkunci { display: none; }
 
 #panel-download.blok-terkunci { min-height: 90px; }
-#panel-rekon.blok-terkunci .overlay-terkunci { font-size: 14px; }
+#panel-rekon.blok-terkunci .overlay-terkunci { font-size: 15px; }
 
 /* ---------- Layout utama: full-height, cuma panel-kanan yang discroll ---------- */
 .app-shell { display: flex; flex: 1; min-height: 0; }
@@ -168,32 +169,32 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 }
 
 .section-label {
-  color: var(--hijau-tua); font-weight: bold; font-size: 14px;
+  color: var(--hijau-tua); font-weight: bold; font-size: 15px;
   margin: 0 0 8px;
 }
 
 .field { margin-bottom: 8px; }
-.field label { display: block; font-size: 12px; margin-bottom: 3px; color: #444; }
+.field label { display: block; font-size: 13px; margin-bottom: 3px; color: #444; }
 .field select, .field input {
-  width: 100%; padding: 6px 8px; font-size: 13px;
+  width: 100%; padding: 7px 8px; font-size: 14px;
   border: 1px solid #ccc; border-radius: 4px; background: var(--putih);
 }
 .field select:disabled { background: var(--abu2); color: #888; }
 
 .log-box {
   background: var(--putih); border: 1px solid #ccc; border-radius: 4px;
-  font-family: Consolas, monospace; font-size: 11px; padding: 8px;
+  font-family: Consolas, monospace; font-size: 12px; padding: 8px;
   height: 90px; overflow-y: auto; margin-top: 8px; white-space: pre-wrap;
 }
 .catatan-kecil {
-  font-size: 11px; color: #888; font-style: italic; margin-top: 6px; line-height: 1.4;
+  font-size: 12px; color: #888; font-style: italic; margin-top: 6px; line-height: 1.4;
 }
 
 /* ---------- Toggle Panel Kanan (Rekon / Rangkuman) ---------- */
 .panel-toggle { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .toggle-btn {
   border: 1px solid var(--hijau-muda); background: var(--putih); color: var(--hijau-tua);
-  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;
+  padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;
 }
 .toggle-btn:hover:not(.aktif) { background: #eafaf1; }
 .toggle-btn.aktif { background: var(--hijau-tua); border-color: var(--hijau-tua); color: var(--putih); }
@@ -211,6 +212,14 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
   overflow-y: auto;
   padding-right: 2px; /* kasih sedikit jarak dari scrollbar */
 }
+/* Rangkuman cuma punya 1 tabel (beda dgn Rekon yang bisa banyak tabel
+   ditumpuk), jadi biarkan .tabel-scroll di dalamnya saja yang scroll
+   vertikal. Kalau #rangkuman-area sendiri JUGA overflow-y:auto, jadinya
+   ada 2 scrollbar vertikal tumpang tindih di kanan -- salah satunya
+   dimatikan di sini. */
+#rangkuman-area {
+  overflow-y: hidden;
+}
 
 .rekon-slicer { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 10px; flex-shrink: 0; }
 .rekon-slicer .field { margin-bottom: 0; min-width: 150px; }
@@ -218,7 +227,7 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; flex-shrink: 0; }
 .tab-btn {
   border: none; background: var(--abu2); color: var(--teks-gelap);
-  padding: 7px 14px; border-radius: 5px 5px 0 0; font-size: 12px; font-weight: bold;
+  padding: 8px 14px; border-radius: 5px 5px 0 0; font-size: 13px; font-weight: bold;
   cursor: pointer;
 }
 .tab-btn.aktif { background: var(--hijau-tua); color: var(--putih); }
@@ -254,7 +263,7 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .tabel-konten { display: inline-block; min-width: 100%; }
 
 .tabel-judul {
-  background: #FFF176; padding: 6px 10px; font-size: 13px; font-weight: bold;
+  background: #FFF176; padding: 7px 10px; font-size: 14px; font-weight: bold;
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
 }
 /* Freeze vertikal: judul kuning nempel di atas tiap tabel selama
@@ -269,16 +278,16 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
   position: sticky; left: 10px; white-space: nowrap;
 }
 .tabel-judul .satuan {
-  font-style: italic; font-weight: normal; font-size: 11px;
+  font-style: italic; font-weight: normal; font-size: 12px;
   position: sticky; right: 10px; white-space: nowrap;
 }
 
 /* Freeze vertikal: baris header kolom (Kode/Nama/Jan/Feb/dst) nempel
    persis di bawah judul kuning saat discroll ke bawah. Nilai "top"
-   disamakan dgn tinggi kira-kira .tabel-judul (padding 6px*2 + font 13px). */
+   disamakan dgn tinggi kira-kira .tabel-judul (padding 7px*2 + font 14px). */
 #rekon-area table.tabel-rekon thead th,
 #rangkuman-area table.tabel-rekon thead th {
-  position: sticky; top: 33px; z-index: 4;
+  position: sticky; top: 36px; z-index: 4;
 }
 
 table.tabel-rekon {
@@ -287,10 +296,10 @@ table.tabel-rekon {
      browser: border yang di-collapse "menembus" background sel sticky,
      jadi kelihatan transparan/numpuk teks. Pakai border-collapse:separate
      supaya tiap sel benar-benar solid & tidak tembus pandang. */
-  border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; min-width: 600px;
+  border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; min-width: 600px;
 }
 table.tabel-rekon th, table.tabel-rekon td {
-  border: 1px solid #ddd; padding: 4px 6px; text-align: center;
+  border: 1px solid #ddd; padding: 5px 7px; text-align: center;
   background-color: var(--putih); /* eksplisit solid, bukan transparan */
 }
 table.tabel-rekon th { background-color: var(--hijau-muda); color: var(--putih); }
@@ -300,15 +309,19 @@ table.tabel-rekon td.outlier { background-color: #fff176 !important; font-weight
 table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-weight: bold; }
 
 /* ---------- Perataan kolom KHUSUS panel Rekonsiliasi (#rekon-area) ----------
-   Tidak berlaku di Rangkuman Data (#rangkuman-area) supaya tabel itu tetap
-   auto-width + scroll horizontal seperti semula (banyak kolom, jangan
-   sampai kepotong jadi "..."). */
+   Dulu pakai table-layout:fixed + overflow:hidden/ellipsis supaya kolom
+   antar tabel yang ditumpuk (Provitas/Produksi/Luas) sejajar -- tapi efek
+   sampingnya angka yang lebih lebar dari kolom kepotong jadi "500,...".
+   Sekarang pakai table-layout:auto (lebar kolom ikut lebar angka
+   terpanjang, jadi full kelihatan) + white-space:nowrap (tetap 1 baris).
+   Kalau tabelnya jadi lebih lebar dari area, tinggal geser scrollbar
+   horizontal (.tabel-scroll / .scroll-atas) ke kanan -- sudah tersedia. */
 #rekon-area table.tabel-rekon {
-  table-layout: fixed; /* lebar kolom konsisten & sejajar antar tabel yang ditumpuk */
+  table-layout: auto;
 }
 #rekon-area table.tabel-rekon th,
 #rekon-area table.tabel-rekon td {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: nowrap;
 }
 #rekon-area table.tabel-rekon td.nama { white-space: normal; }
 
@@ -329,11 +342,11 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
 #rekon-area table.tabel-rekon.tabel-rata2 td:nth-child(1) { width: 276px; text-align: left; } /* 42+64+170 */
 
 .chart-wrap { background: var(--putih); border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; margin-bottom: 20px; }
-.chart-wrap h4 { margin: 0 0 8px; font-size: 13px; color: var(--hijau-tua); }
+.chart-wrap h4 { margin: 0 0 8px; font-size: 14px; color: var(--hijau-tua); }
 .chart-wrap canvas { max-height: 320px; }
 
 .placeholder-kosong {
-  text-align: center; color: #999; font-style: italic; padding: 40px 0;
+  text-align: center; color: #999; font-style: italic; padding: 40px 0; font-size: 14px;
 }
 
 /* ---------- Tabel Rangkuman ---------- */
@@ -382,12 +395,12 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
   .header {
     height: auto; flex-wrap: wrap; padding: 8px 12px; row-gap: 4px;
   }
-  .header .judul { font-size: 14px; }
-  .header .subjudul { font-size: 10px; margin-left: 0; flex-basis: 100%; }
-  .header .user-info { font-size: 11px; margin-right: 6px; }
-  .header button.logout { padding: 4px 8px; font-size: 11px; }
+  .header .judul { font-size: 15px; }
+  .header .subjudul { font-size: 11px; margin-left: 0; flex-basis: 100%; }
+  .header .user-info { font-size: 12px; margin-right: 6px; }
+  .header button.logout { padding: 5px 8px; font-size: 12px; }
 
-  .info-bar { font-size: 11px; padding: 5px 12px; }
+  .info-bar { font-size: 12px; padding: 6px 12px; }
 
   .panel-kiri { padding: 12px; }
 
@@ -395,7 +408,7 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
   .rekon-slicer .field { min-width: 0; }
 
   .tab-bar { flex-wrap: wrap; }
-  .tab-btn { padding: 6px 10px; font-size: 11px; }
+  .tab-btn { padding: 7px 10px; font-size: 12px; }
 
   .panel-toggle { flex-direction: column; }
 
@@ -404,11 +417,11 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
   .chart-wrap { padding: 8px; }
   .chart-wrap canvas { max-height: 260px; }
 
-  .overlay-terkunci { font-size: 12px; padding: 14px; }
+  .overlay-terkunci { font-size: 13px; padding: 14px; }
 }
 
 @media (max-width: 480px) {
   .splash-logo { width: 80px; height: 80px; }
-  table.tabel-rekon { font-size: 11px; min-width: 520px; }
-  table.tabel-rekon th, table.tabel-rekon td { padding: 3px 5px; }
+  table.tabel-rekon { font-size: 12px; min-width: 520px; }
+  table.tabel-rekon th, table.tabel-rekon td { padding: 4px 6px; }
 }
