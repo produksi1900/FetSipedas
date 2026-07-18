@@ -1566,7 +1566,7 @@ async function downloadRangkumanExcel() {
   btn.textContent = "⏳ Mengambil data...";
   log.textContent = "Memuat semua jenis SPH...";
 
-  const jenisUrutan = ["sbs", "tbf", "th", "bst"]; // urutan sheet di Excel
+  const jenisUrutan = ["sbs", "bst", "tbf", "th"]; // urutan sheet di Excel
 
   try {
     // Fetch semua jenis + tahun lalu secara paralel
