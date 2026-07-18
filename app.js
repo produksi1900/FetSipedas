@@ -1309,12 +1309,6 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
         </div>
       </div>
     </div>
-    <div class="catatan-kecil" style="margin-top:8px;">
-      q-to-q &amp; y-on-y: dihitung dari triwulan terakhir yang ada datanya di tahun ${tahun}.
-      c-to-c: kumulatif s.d. TW terakhir tahun ${tahun} vs kumulatif s.d. TW yang sama tahun ${tahun - 1}.
-      Nilai "-" muncul kalau pembilang &amp; penyebut keduanya nol.
-      Jika hanya salah satu yang nol: +100% atau −100%.
-    </div>
   `;
 
   initScrollAtas(area);
