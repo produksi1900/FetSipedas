@@ -196,11 +196,27 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .tab-btn.aktif { background: var(--hijau-tua); color: var(--putih); }
 
 .tabel-blok { margin-bottom: 20px; background: var(--putih); border-radius: 6px; overflow: hidden; border: 1px solid #e0e0e0; }
+
+/* .tabel-konten membungkus judul+tabel supaya lebarnya SAMA dgn lebar asli
+   tabel (termasuk bagian yg baru kelihatan setelah discroll ke kanan).
+   Trik: inline-block otomatis melebar mengikuti anak terlebarnya (tabel),
+   lalu .tabel-judul (block, width:auto) ikut melebar 100% dari situ --
+   jadi background kuningnya nyambung sampai ujung kanan tabel. */
+.tabel-konten { display: inline-block; min-width: 100%; }
+
 .tabel-judul {
   background: #FFF176; padding: 6px 10px; font-size: 13px; font-weight: bold;
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
 }
-.tabel-judul .satuan { font-style: italic; font-weight: normal; font-size: 11px; }
+/* Judul & satuan nempel (sticky) di kiri/kanan AREA YANG KELIHATAN saat
+   discroll horizontal, jadi tetap terbaca ke mana pun posisi scroll. */
+.tabel-judul > span:first-child {
+  position: sticky; left: 10px; white-space: nowrap;
+}
+.tabel-judul .satuan {
+  font-style: italic; font-weight: normal; font-size: 11px;
+  position: sticky; right: 10px; white-space: nowrap;
+}
 
 .tabel-blok { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table.tabel-rekon {

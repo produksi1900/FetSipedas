@@ -733,7 +733,10 @@ function buatTabelKecPeriode({ judul, satuan, kecRows, matrix, nPeriode, headerL
 
   const blok = document.createElement("div");
   blok.className = "tabel-blok";
-  blok.innerHTML = `<div class="tabel-judul"><span>${judul}</span><span class="satuan">${satuan}</span></div>`;
+  const konten = document.createElement("div");
+  konten.className = "tabel-konten";
+  konten.innerHTML = `<div class="tabel-judul"><span>${judul}</span><span class="satuan">${satuan}</span></div>`;
+  blok.appendChild(konten);
 
   const table = document.createElement("table");
   table.className = "tabel-rekon";
@@ -758,7 +761,7 @@ function buatTabelKecPeriode({ judul, satuan, kecRows, matrix, nPeriode, headerL
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  blok.appendChild(table);
+  konten.appendChild(table);
   return blok;
 }
 
@@ -772,7 +775,10 @@ function buatTabelRata2PerKab({ judul, tab, cfg, rowsSemua, nPeriode, headerLabe
   const labelAxis = cfg.periodeCol === "triwulan" ? "Triwulan" : "Bulan";
   const blok = document.createElement("div");
   blok.className = "tabel-blok";
-  blok.innerHTML = `<div class="tabel-judul"><span>Rata-Rata ${judul} menurut Kabupaten &amp; ${labelAxis}</span></div>`;
+  const konten = document.createElement("div");
+  konten.className = "tabel-konten";
+  konten.innerHTML = `<div class="tabel-judul"><span>Rata-Rata ${judul} menurut Kabupaten &amp; ${labelAxis}</span></div>`;
+  blok.appendChild(konten);
 
   const table = document.createElement("table");
   table.className = "tabel-rekon tabel-rata2";
@@ -821,7 +827,7 @@ function buatTabelRata2PerKab({ judul, tab, cfg, rowsSemua, nPeriode, headerLabe
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
-  blok.appendChild(table);
+  konten.appendChild(table);
   return { blok, perKabAvg };
 }
 
@@ -1160,14 +1166,16 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
 
   area.innerHTML = `
     <div class="tabel-blok">
-      <div class="tabel-judul">
-        <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
-        <span class="satuan">Satuan: ${rc.satuan} · q-to-q, y-on-y &amp; c-to-c dalam %</span>
+      <div class="tabel-konten">
+        <div class="tabel-judul">
+          <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
+          <span class="satuan">Satuan: ${rc.satuan} · q-to-q, y-on-y &amp; c-to-c dalam %</span>
+        </div>
+        <table class="tabel-rekon">
+          <thead><tr>${kolomHead}</tr></thead>
+          <tbody>${bodyRows}<tr>${tdsTotal}</tr></tbody>
+        </table>
       </div>
-      <table class="tabel-rekon">
-        <thead><tr>${kolomHead}</tr></thead>
-        <tbody>${bodyRows}<tr>${tdsTotal}</tr></tbody>
-      </table>
     </div>
     <div class="catatan-kecil" style="margin-top:8px;">
       q-to-q &amp; y-on-y: dihitung dari triwulan terakhir yang ada datanya di tahun ${tahun}.
