@@ -495,7 +495,7 @@ async function downloadData() {
     logBox.textContent = `✗ Gagal mengambil/export data: ${e.message}`;
   } finally {
     btn.disabled = false;
-    btn.textContent = "⬇ Download Data (Excel)";
+    btn.textContent = "⬇ Download Raw Data (Excel)";
   }
 }
 

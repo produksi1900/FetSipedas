@@ -106,7 +106,7 @@
             </select>
           </div>
 
-          <button class="btn-login" id="btn-download" disabled>⬇ Download Data (Excel)</button>
+          <button class="btn-login" id="btn-download" disabled>⬇ Download Raw Data (Excel)</button>
           <div class="log-box" id="log-download">Data diambil dari database (hasil sinkronisasi terakhir dari aplikasi desktop).</div>
           <div class="catatan-kecil" id="catatan-download-desktop">
             File Excel hasil download ini bisa langsung dipakai di aplikasi
@@ -208,18 +208,17 @@
                 <option value="semua">— Semua Kabupaten/Kota (Provinsi) —</option>
               </select>
             </div>
+            <div class="field" style="min-width:0;">
+              <label>&nbsp;</label>
+              <button class="btn-login" id="btn-download-rangkuman" style="width:auto; padding:8px 18px; white-space:nowrap;" disabled>
+                ⬇ Download Rangkuman Excel (Semua SPH)
+              </button>
+            </div>
           </div>
+          <div style="margin:-4px 0 10px; font-size:11px; color:#888; font-style:italic;" id="log-download-rangkuman"></div>
 
           <div id="rangkuman-area">
             <div class="placeholder-kosong">Pilih jenis SPH, tahun & kabupaten untuk mulai.</div>
-          </div>
-
-          <!-- Tombol download semua jenis SPH sekaligus -->
-          <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button class="btn-login" id="btn-download-rangkuman" style="width:auto; padding:8px 18px;" disabled>
-              ⬇ Download Rangkuman Excel (Semua SPH)
-            </button>
-            <span id="log-download-rangkuman" style="font-size:11px; color:#888; font-style:italic;"></span>
           </div>
         </div>
 
