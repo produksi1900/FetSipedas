@@ -188,6 +188,7 @@ async function masukKeApp() {
     $("wrap-kab-download").classList.add("hidden");
   }
   $("btn-download").disabled = false;
+  $("btn-download-rangkuman").disabled = false;
 
   isiPilihanTahun($("sel-tahun-rekon"));
 
@@ -229,6 +230,8 @@ function keluarDariApp() {
   bukaKunci(false);
 
   $("btn-download").disabled = true;
+  $("btn-download-rangkuman").disabled = true;
+  $("log-download-rangkuman").textContent = "";
   $("wrap-kab-download").classList.add("hidden");
   $("panel-referensi").classList.add("hidden");
   $("in-file-referensi").value = "";
@@ -1072,8 +1075,9 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
   const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabPilihan);
   const labelKab = kabPilihan === "semua" ? "Semua Kabupaten/Kota (Provinsi)" : (kabEntry ? kabEntry.nama : kabPilihan);
 
+  const BULAN_SINGKAT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
   let kolomHead = `<th>Kode</th><th>Nama</th><th>Satuan</th>`;
-  if (pakaiBulan) kolomHead += BULAN_NAMA.map((b) => `<th>${b}</th>`).join("");
+  if (pakaiBulan) kolomHead += BULAN_SINGKAT.map((b) => `<th>${b}</th>`).join("");
   kolomHead += `<th>TW 1</th><th>TW 2</th><th>TW 3</th><th>TW 4</th><th>Jumlah</th><th>q-to-q</th><th>y-on-y</th><th>c-to-c</th>`;
 
   const totalBulan = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
@@ -1173,6 +1177,294 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
     </div>
   `;
 }
+
+// ============================================================
+// DOWNLOAD RANGKUMAN EXCEL — semua jenis SPH dalam 1 file
+// ============================================================
+// Satu sheet per jenis SPH (SBS, BST, TBF, TH). Styling pakai
+// SheetJS cell-level format: header hijau (#1f9d6e), judul kuning
+// (#FFF176), growth positif hijau / negatif merah, baris total bold,
+// border tipis semua cell -- semirip mungkin dengan tampilan web.
+
+// Warna (ARGB tanpa #, format SheetJS)
+const XL_HIJAU_HEADER = "FF1f9d6e"; // header kolom (sama dgn --hijau-muda)
+const XL_KUNING_JUDUL = "FFFFF176"; // judul tabel (sama dgn .tabel-judul bg)
+const XL_HIJAU_GROWTH = "FF1f9d6e"; // growth positif
+const XL_MERAH_GROWTH = "FFc0392b"; // growth negatif (--merah)
+const XL_TOTAL_BG     = "FFe8ede9"; // baris total (--abu2)
+const XL_PUTIH        = "FFFFFFFF";
+
+function xlBorder() {
+  const s = { style: "thin", color: { rgb: "FFCCCCCC" } };
+  return { top: s, bottom: s, left: s, right: s };
+}
+
+function xlCell(v, opts = {}) {
+  // v bisa string/number/null. opts: bold, color (ARGB), bgColor (ARGB), align, numFmt
+  const cell = { v: v ?? "", t: typeof v === "number" ? "n" : "s" };
+  if (v === null || v === undefined) { cell.v = ""; cell.t = "s"; }
+  const s = { border: xlBorder(), alignment: { horizontal: opts.align ?? "center", vertical: "center", wrapText: false } };
+  if (opts.bold || opts.bgColor || opts.color) {
+    s.font = {};
+    if (opts.bold) s.font.bold = true;
+    if (opts.color) s.font.color = { rgb: opts.color };
+    if (opts.bgColor) { s.fill = { patternType: "solid", fgColor: { rgb: opts.bgColor } }; }
+  }
+  if (opts.numFmt) s.numFmt = opts.numFmt;
+  cell.s = s;
+  return cell;
+}
+
+// Hitung growth untuk satu komoditi/total, kembalikan {qtoq, yoy, ctoc}
+function hitungGrowthXl(d, dLalu) {
+  const twNow = twTerakhirAdaData(d.tw);
+  if (twNow === null) return { qtoq: null, yoy: null, ctoc: null };
+  const valNow   = d.tw[twNow] || 0;
+  const valPrevQ = twNow === 1 ? (dLalu.tw[4] || 0) : (d.tw[twNow - 1] || 0);
+  const valYoy   = dLalu.tw[twNow] || 0;
+  let kumulIni = 0, kumulLalu = 0;
+  for (let t = 1; t <= twNow; t++) { kumulIni += d.tw[t] || 0; kumulLalu += dLalu.tw[t] || 0; }
+  return hitungGrowth(valNow, valPrevQ, valYoy, kumulIni, kumulLalu);
+}
+
+// Tulis satu sheet rangkuman ke workbook
+function tulisSheetRangkuman(wb, sheetName, cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
+  const mapIni  = agregasiRangkuman(cfg, rc, rowsIni);
+  const mapLalu = agregasiRangkuman(cfg, rc, rowsLalu);
+
+  const urutanMap = state.idTanamanUrutan[jenis] || {};
+  const namaList  = Array.from(mapIni.keys()).sort((a, b) => {
+    const ua = urutanMap[normalisasiNamaTanaman(a)];
+    const ub = urutanMap[normalisasiNamaTanaman(b)];
+    if (ua !== undefined && ub !== undefined) return ua - ub;
+    if (ua !== undefined) return -1;
+    if (ub !== undefined) return 1;
+    return a.localeCompare(b, "id");
+  });
+
+  const pakaiBulan = cfg.periodeCol === "bulan";
+  const kabEntry   = DAFTAR_KAB_BABEL.find((k) => k.id === kabPilihan);
+  const labelKab   = kabPilihan === "semua"
+    ? "Semua Kabupaten/Kota (Provinsi)"
+    : (kabEntry ? kabEntry.nama : kabPilihan);
+
+  // Susun kolom header
+  const BULAN_SINGKAT_XL = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  const headers = ["Kode", "Nama", "Satuan"];
+  if (pakaiBulan) BULAN_SINGKAT_XL.forEach((b) => headers.push(b));
+  headers.push("TW 1", "TW 2", "TW 3", "TW 4", "Jumlah", "q-to-q (%)", "y-on-y (%)", "c-to-c (%)");
+
+  const nCol = headers.length;
+  const ws   = {};
+  const range = { s: { r: 0, c: 0 }, e: { r: 0, c: nCol - 1 } };
+
+  const setCell = (r, c, cell) => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    ws[addr] = cell;
+    if (r > range.e.r) range.e.r = r;
+    if (c > range.e.c) range.e.c = c;
+  };
+
+  // ---- Baris 0: judul tabel ----
+  const judulTeks = `Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}  |  Satuan: Kuintal · q-to-q, y-on-y, c-to-c dalam %`;
+  setCell(0, 0, xlCell(judulTeks, { bold: true, bgColor: XL_KUNING_JUDUL, align: "left" }));
+  for (let c = 1; c < nCol; c++) setCell(0, c, xlCell("", { bgColor: XL_KUNING_JUDUL }));
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nCol - 1 } }];
+
+  // ---- Baris 1: header kolom ----
+  headers.forEach((h, c) => {
+    setCell(1, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: c <= 2 ? "left" : "center" }));
+  });
+
+  // Indeks kolom growth (selalu 3 kolom terakhir)
+  const iJumlah = nCol - 4;
+  const iQtoQ   = nCol - 3;
+  const iYoy    = nCol - 2;
+  const iCtoc   = nCol - 1;
+
+  const totalBulan = {};
+  for (let b = 1; b <= 12; b++) totalBulan[b] = 0;
+  const totalTw   = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const totalTwLalu = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  let totalKumulIni = 0, totalKumulLalu = 0;
+
+  let dataRow = 2;
+
+  namaList.forEach((nama) => {
+    const d     = mapIni.get(nama);
+    const dLalu = mapLalu.get(nama) || { tw: { 1: 0, 2: 0, 3: 0, 4: 0 }, bulan: {} };
+    const { qtoq, yoy, ctoc } = hitungGrowthXl(d, dLalu);
+
+    // Kumulatif untuk total
+    const twNow = twTerakhirAdaData(d.tw);
+    let kumulIni = 0, kumulLalu = 0;
+    if (twNow !== null) {
+      for (let t = 1; t <= twNow; t++) { kumulIni += d.tw[t] || 0; kumulLalu += dLalu.tw[t] || 0; }
+    }
+    totalKumulIni  += kumulIni;
+    totalKumulLalu += kumulLalu;
+
+    let col = 0;
+    setCell(dataRow, col++, xlCell(d.idtanaman || "-", { align: "left" }));
+    setCell(dataRow, col++, xlCell(nama,               { align: "left" }));
+    setCell(dataRow, col++, xlCell("Kuintal",          { align: "left" }));
+
+    if (pakaiBulan) {
+      for (let b = 1; b <= 12; b++) {
+        const v = d.bulan[b] || 0;
+        totalBulan[b] += v;
+        setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00" }));
+      }
+    }
+    for (let t = 1; t <= 4; t++) {
+      const v = d.tw[t] || 0;
+      totalTw[t]   += v;
+      totalTwLalu[t] += (dLalu.tw[t] || 0);
+      setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00" }));
+    }
+
+    const jumlah = (d.tw[1]||0)+(d.tw[2]||0)+(d.tw[3]||0)+(d.tw[4]||0);
+    setCell(dataRow, col++, xlCell(jumlah === 0 ? null : jumlah, { numFmt: "#,##0.00" }));
+
+    // Growth cells — warna sesuai nilai
+    const growthCell = (v) => {
+      if (v === null) return xlCell("-");
+      const color = v > 0 ? XL_HIJAU_GROWTH : v < 0 ? XL_MERAH_GROWTH : undefined;
+      const c = xlCell(v, { numFmt: "#,##0.00", color });
+      return c;
+    };
+    setCell(dataRow, col++, growthCell(qtoq));
+    setCell(dataRow, col++, growthCell(yoy));
+    setCell(dataRow, col++, growthCell(ctoc));
+
+    dataRow++;
+  });
+
+  // ---- Baris TOTAL ----
+  const totalD     = { tw: totalTw };
+  const totalDLalu = { tw: totalTwLalu };
+  const { qtoq: qtoqT, yoy: yoyT, ctoc: ctocT } = hitungGrowthXl(totalD, totalDLalu);
+  // override kumulatif total (hitungGrowthXl pakai twTerakhir dari totalTw yg mungkin beda)
+  // hitung ulang pakai totalKumulIni/Lalu yang sudah diakumulasi di loop
+  const twNowTotal = twTerakhirAdaData(totalTw);
+  let qtoqTf = null, yoyTf = null, ctocTf = null;
+  if (twNowTotal !== null) {
+    const vNow   = totalTw[twNowTotal];
+    const vPrevQ = twNowTotal === 1 ? totalTwLalu[4] : totalTw[twNowTotal - 1];
+    const vYoy   = totalTwLalu[twNowTotal];
+    ({ qtoq: qtoqTf, yoy: yoyTf, ctoc: ctocTf } =
+      hitungGrowth(vNow, vPrevQ, vYoy, totalKumulIni, totalKumulLalu));
+  }
+
+  let col = 0;
+  setCell(dataRow, col++, xlCell("",       { bold: true, bgColor: XL_TOTAL_BG }));
+  setCell(dataRow, col++, xlCell("TOTAL",  { bold: true, bgColor: XL_TOTAL_BG, align: "left" }));
+  setCell(dataRow, col++, xlCell("",       { bold: true, bgColor: XL_TOTAL_BG }));
+
+  if (pakaiBulan) {
+    for (let b = 1; b <= 12; b++) {
+      const v = totalBulan[b] || 0;
+      setCell(dataRow, col++, xlCell(v === 0 ? null : v, { bold: true, bgColor: XL_TOTAL_BG, numFmt: "#,##0.00" }));
+    }
+  }
+  for (let t = 1; t <= 4; t++) {
+    const v = totalTw[t] || 0;
+    setCell(dataRow, col++, xlCell(v === 0 ? null : v, { bold: true, bgColor: XL_TOTAL_BG, numFmt: "#,##0.00" }));
+  }
+  const jumlahTotal = (totalTw[1]||0)+(totalTw[2]||0)+(totalTw[3]||0)+(totalTw[4]||0);
+  setCell(dataRow, col++, xlCell(jumlahTotal === 0 ? null : jumlahTotal, { bold: true, bgColor: XL_TOTAL_BG, numFmt: "#,##0.00" }));
+
+  const growthTotalCell = (v) => {
+    if (v === null) return xlCell("-", { bold: true, bgColor: XL_TOTAL_BG });
+    const color = v > 0 ? XL_HIJAU_GROWTH : v < 0 ? XL_MERAH_GROWTH : undefined;
+    return xlCell(v, { bold: true, bgColor: XL_TOTAL_BG, numFmt: "#,##0.00", color });
+  };
+  setCell(dataRow, col++, growthTotalCell(qtoqTf));
+  setCell(dataRow, col++, growthTotalCell(yoyTf));
+  setCell(dataRow, col++, growthTotalCell(ctocTf));
+
+  ws["!ref"]  = XLSX.utils.encode_range(range);
+
+  // Lebar kolom: Nama agak lebar, sisanya standar
+  const colWidths = headers.map((h, i) => {
+    if (i === 1) return { wch: 28 };  // Nama
+    if (i === 2) return { wch: 10 };  // Satuan
+    if (i === 0) return { wch: 14 };  // Kode
+    return { wch: 11 };
+  });
+  ws["!cols"] = colWidths;
+
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+}
+
+async function downloadRangkumanExcel() {
+  if (!state.profile) return;
+
+  const tahun      = Number($("sel-tahun-rangkuman").value);
+  const kabPilihan = $("sel-kab-rangkuman").value;
+  const btn        = $("btn-download-rangkuman");
+  const log        = $("log-download-rangkuman");
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Mengambil data...";
+  log.textContent = "Memuat semua jenis SPH...";
+
+  const jenisUrutan = ["sbs", "tbf", "th", "bst"]; // urutan sheet di Excel
+
+  try {
+    // Fetch semua jenis + tahun lalu secara paralel
+    const hasilFetch = await Promise.all(
+      jenisUrutan.map(async (jenis) => {
+        const cfg = SPH_CONFIG[jenis];
+        const rc  = cfg.rangkuman;
+        if (!rc) return { jenis, rowsIni: [], rowsLalu: [] };
+
+        const ambil = (thn) => fetchAllRows((from, to) => {
+          let q = supabase
+            .from(cfg.table)
+            .select(`namatanaman, idtanaman, ${cfg.periodeCol}, ${rc.produksiCol}`)
+            .eq("tahun", thn);
+          if (kabPilihan !== "semua") q = q.eq("nama_kab", kabPilihan);
+          return q.range(from, to);
+        });
+
+        const [rowsIni, rowsLalu] = await Promise.all([ambil(tahun), ambil(tahun - 1)]);
+        return { jenis, rowsIni, rowsLalu };
+      })
+    );
+
+    log.textContent = "Menyusun Excel...";
+
+    const wb = XLSX.utils.book_new();
+
+    for (const { jenis, rowsIni, rowsLalu } of hasilFetch) {
+      const cfg      = SPH_CONFIG[jenis];
+      const rc       = cfg.rangkuman;
+      if (!rc) continue;
+      if (rowsIni.length === 0) continue; // skip jenis yang tidak ada datanya
+      tulisSheetRangkuman(wb, cfg.label, cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan);
+    }
+
+    if (wb.SheetNames.length === 0) {
+      log.textContent = `Tidak ada data untuk tahun ${tahun}.`;
+      return;
+    }
+
+    const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabPilihan);
+    const labelKabFile = kabPilihan === "semua" ? "SemuaKab" : (kabEntry ? kabEntry.nama.replace(/\s+/g, "") : kabPilihan);
+    const namaFile = `Rangkuman_SPH_${labelKabFile}_${tahun}.xlsx`;
+
+    XLSX.writeFile(wb, namaFile, { bookSST: false, cellStyles: true });
+    log.textContent = `✓ Selesai! ${wb.SheetNames.length} sheet (${wb.SheetNames.join(", ")}) → "${namaFile}"`;
+  } catch (e) {
+    log.textContent = `✗ Gagal: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⬇ Download Rangkuman Excel (Semua SPH)";
+  }
+}
+
+$("btn-download-rangkuman").addEventListener("click", downloadRangkumanExcel);
 
 // ============================================================
 // Mulai
