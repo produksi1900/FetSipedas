@@ -775,7 +775,7 @@ function buatTabelRata2PerKab({ judul, tab, cfg, rowsSemua, nPeriode, headerLabe
   blok.innerHTML = `<div class="tabel-judul"><span>Rata-Rata ${judul} menurut Kabupaten &amp; ${labelAxis}</span></div>`;
 
   const table = document.createElement("table");
-  table.className = "tabel-rekon";
+  table.className = "tabel-rekon tabel-rata2";
   table.innerHTML = `<thead><tr>${["Kabupaten", ...headerLabels].map((c) => `<th>${c}</th>`).join("")}</tr></thead>`;
   const tbody = document.createElement("tbody");
 

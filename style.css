@@ -203,15 +203,35 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .tabel-judul .satuan { font-style: italic; font-weight: normal; font-size: 11px; }
 
 .tabel-blok { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table.tabel-rekon { border-collapse: collapse; width: 100%; font-size: 12px; min-width: 600px; }
+table.tabel-rekon {
+  border-collapse: collapse; width: 100%; font-size: 12px; min-width: 600px;
+  table-layout: fixed; /* lebar kolom konsisten & sejajar antar tabel yang ditumpuk */
+}
 table.tabel-rekon th, table.tabel-rekon td {
   border: 1px solid #ddd; padding: 4px 6px; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 table.tabel-rekon th { background: var(--hijau-muda); color: var(--putih); }
-table.tabel-rekon td.nama { text-align: left; }
+table.tabel-rekon td.nama { text-align: left; white-space: normal; }
 table.tabel-rekon tr:nth-child(even) td { background: #f8f8f8; }
 table.tabel-rekon td.outlier { background: #fff176 !important; font-weight: bold; }
 table.tabel-rekon td.outlier-rata { background: #fff176 !important; font-weight: bold; }
+
+/* Tabel kec x periode (No, Kode, Kecamatan, lalu kolom periode, lalu Mean):
+   kunci lebar 3 kolom pertama supaya kolom periode berikutnya sejajar
+   antar tabel yang ditumpuk (Provitas / Produksi / Luas Panen). */
+table.tabel-rekon:not(.tabel-rata2) th:nth-child(1),
+table.tabel-rekon:not(.tabel-rata2) td:nth-child(1) { width: 42px; }  /* No */
+table.tabel-rekon:not(.tabel-rata2) th:nth-child(2),
+table.tabel-rekon:not(.tabel-rata2) td:nth-child(2) { width: 64px; }  /* Kode */
+table.tabel-rekon:not(.tabel-rata2) th:nth-child(3),
+table.tabel-rekon:not(.tabel-rata2) td:nth-child(3) { width: 170px; } /* Kecamatan */
+
+/* Tabel Rata-Rata per Kabupaten cuma punya 1 kolom label (Kabupaten),
+   dilebarkan sebesar gabungan No+Kode+Kecamatan di atas supaya kolom
+   periode berikutnya tetap sejajar dengan tabel-tabel lain. */
+table.tabel-rekon.tabel-rata2 th:nth-child(1),
+table.tabel-rekon.tabel-rata2 td:nth-child(1) { width: 276px; text-align: left; } /* 42+64+170 */
 
 .chart-wrap { background: var(--putih); border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; margin-bottom: 20px; }
 .chart-wrap h4 { margin: 0 0 8px; font-size: 13px; color: var(--hijau-tua); }

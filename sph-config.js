@@ -60,14 +60,14 @@ export const SPH_CONFIG = {
     periodeLabels: ["1", "2", "3", "4"],
     judulPeriode: "Triwulan",
     tabs: [
-      { key: "provitas_habis", label: "Provitas Habis", satuan: "Kw/Ha",
+      { key: "provitas_habis", label: "Provitas Habis", satuan: "Kg/M2",
         numer: "produksi_habis", denom: "luas_panen_habis",
         rawNumer: { label: "Produksi Habis", satuan: "Kg", factor: 1 },
-        rawDenom: { label: "Luas Panen Habis", satuan: "Ha", factor: 1 } },
-      { key: "provitas_belum", label: "Provitas Belum Habis", satuan: "Kw/Ha",
+        rawDenom: { label: "Luas Panen Habis", satuan: "M2", factor: 1 } },
+      { key: "provitas_belum", label: "Provitas Belum Habis", satuan: "Kg/M2",
         numer: "produksi_belum_habis", denom: "luas_panen_belum_habis",
         rawNumer: { label: "Produksi Belum Habis", satuan: "Kg", factor: 1 },
-        rawDenom: { label: "Luas Panen Belum Habis", satuan: "Ha", factor: 1 } },
+        rawDenom: { label: "Luas Panen Belum Habis", satuan: "M2", factor: 1 } },
       { key: "harga", label: "Harga Jual Petani", satuan: "Rp/Kg", single: "harga_jual_petani" },
     ],
     excelCols: {
