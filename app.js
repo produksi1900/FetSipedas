@@ -190,6 +190,9 @@ async function masukKeApp() {
   $("btn-download").disabled = false;
   $("btn-download-rangkuman").disabled = false;
 
+  // Catatan "bisa dipakai di aplikasi desktop" cuma relevan utk role prov.
+  $("catatan-download-desktop").classList.toggle("hidden", profile.role !== "prov");
+
   isiPilihanTahun($("sel-tahun-rekon"));
 
   // ---- Section 3: Referensi ID Tanaman (khusus prov) ----
@@ -331,12 +334,88 @@ $("btn-view-rangkuman").addEventListener("click", () => gantiView("rangkuman"));
 // sinkronisasi desktop), yang jauh lebih stabil dan mudah dicocokkan.
 $("btn-download").addEventListener("click", downloadData);
 
+// Ambil semua baris mentah 1 jenis SPH utk 1 kombinasi tahun+kab.
+async function ambilRowsMentah(jenis, tahun, kabNama) {
+  const cfg = SPH_CONFIG[jenis];
+  return await fetchAllRows((from, to) => {
+    let query = supabase.from(cfg.table).select("*").eq("tahun", tahun);
+    if (kabNama) query = query.eq("nama_kab", kabNama);
+    return query
+      .order(cfg.periodeCol, { ascending: true })
+      .order("kab", { ascending: true })
+      .order("urutkec", { ascending: true })
+      .order("idtanaman", { ascending: true, nullsFirst: false })
+      .range(from, to);
+  });
+}
+
+// Susun baris Excel: kolom umum + kolom indikator dgn nama sesuai
+// excelCols (mengandung kata kunci yang dicari fitur_rekon.py).
+function buatRowsExcelMentah(cfg, rows) {
+  return rows.map((r) => {
+    const out = {
+      idtanaman: r.idtanaman,
+      namatanaman: r.namatanaman,
+      kab: r.kab,
+      nama_kab: r.nama_kab,
+      urutkec: r.urutkec,
+      kec: r.kec,
+      nama_kec: r.nama_kec,
+      tahun: r.tahun,
+      [cfg.periodeCol]: r[cfg.periodeCol],
+    };
+    for (const [dbCol, headerExcel] of Object.entries(cfg.excelCols)) {
+      out[headerExcel] = r[dbCol] ?? 0;
+    }
+    return out;
+  });
+}
+
+// Tulis 1 sheet data mentah ke workbook dgn styling: header hijau + teks
+// putih bold, baris data selang-seling abu-abu (sama seperti sheet
+// Rangkuman). rowsExcel = array of object (hasil buatRowsExcelMentah).
+function tulisSheetDataMentah(wb, sheetName, rowsExcel) {
+  if (!rowsExcel || rowsExcel.length === 0) return;
+  const headers = Object.keys(rowsExcel[0]);
+  const nCol = headers.length;
+  const ws = {};
+  const range = { s: { r: 0, c: 0 }, e: { r: 0, c: nCol - 1 } };
+
+  const setCell = (r, c, cell) => {
+    ws[XLSX.utils.encode_cell({ r, c })] = cell;
+    if (r > range.e.r) range.e.r = r;
+    if (c > range.e.c) range.e.c = c;
+  };
+
+  // Baris 0: header kolom (hijau, teks putih bold)
+  headers.forEach((h, c) => {
+    setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" }));
+  });
+
+  // Baris data, selang-seling abu-abu tiap baris genap (0-indexed ganjil)
+  rowsExcel.forEach((row, i) => {
+    const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
+    headers.forEach((h, c) => {
+      const v = row[h];
+      const isNum = typeof v === "number";
+      setCell(i + 1, c, xlCell(v, {
+        bgColor: stripeBg,
+        align: isNum ? "center" : "left",
+        numFmt: isNum ? "#,##0.00" : undefined,
+      }));
+    });
+  });
+
+  ws["!ref"] = XLSX.utils.encode_range(range);
+  ws["!cols"] = headers.map((h) => ({ wch: Math.max(12, h.length + 2) }));
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+}
+
 async function downloadData() {
   if (!state.profile) return;
 
-  const jenis = $("sel-jenis-download").value;
+  const jenisPilihan = $("sel-jenis-download").value; // bisa "semua" atau salah satu jenis
   const tahun = Number($("sel-tahun-download").value);
-  const cfg = SPH_CONFIG[jenis];
   const logBox = $("log-download");
   const btn = $("btn-download");
 
@@ -354,61 +433,62 @@ async function downloadData() {
 
   btn.disabled = true;
   btn.textContent = "⏳ Mengambil data...";
-  logBox.textContent = `Mengambil data ${jenis.toUpperCase()} tahun ${tahun} dari database...`;
+
+  const jenisList = jenisPilihan === "semua" ? ["sbs", "tbf", "th", "bst"] : [jenisPilihan];
+  const labelKabFile = (kabNama ?? "SemuaKab").replace(/\s+/g, "");
 
   try {
-    const rows = await fetchAllRows((from, to) => {
-      let query = supabase.from(cfg.table).select("*").eq("tahun", tahun);
-      if (kabNama) query = query.eq("nama_kab", kabNama);
-      return query
-        .order(cfg.periodeCol, { ascending: true })
-        .order("kab", { ascending: true })
-        .order("urutkec", { ascending: true })
-        .order("idtanaman", { ascending: true, nullsFirst: false })
-        .range(from, to);
-    });
+    const wb = XLSX.utils.book_new();
+    let totalRows = 0;
+    const ringkasan = [];
 
-    if (!rows || rows.length === 0) {
+    for (const jenis of jenisList) {
+      const cfg = SPH_CONFIG[jenis];
+      logBox.textContent = `Mengambil data ${cfg.label} tahun ${tahun} dari database...`;
+
+      const rows = await ambilRowsMentah(jenis, tahun, kabNama);
+      if (!rows || rows.length === 0) {
+        ringkasan.push(`${cfg.label}: tidak ada data`);
+        continue;
+      }
+
+      const rowsExcel = buatRowsExcelMentah(cfg, rows);
+      // Untuk download 1 jenis saja, nama sheet "Sheet1" (spy tetap
+      // kompatibel dgn menu "Pilih File Raw" di aplikasi desktop).
+      // Untuk "Semua SPH", tiap jenis dapat tab tersendiri.
+      const sheetName = jenisPilihan === "semua" ? cfg.label : "Sheet1";
+      tulisSheetDataMentah(wb, sheetName, rowsExcel);
+      totalRows += rows.length;
+      ringkasan.push(`${cfg.label}: ${rows.length} baris`);
+    }
+
+    if (wb.SheetNames.length === 0) {
       logBox.textContent =
-        `Tidak ada data ${jenis.toUpperCase()} tahun ${tahun}` +
+        `Tidak ada data tahun ${tahun}` +
         `${kabNama ? "" : " untuk seluruh kabupaten"}.\n` +
         `(Kemungkinan belum ada sinkronisasi dari aplikasi desktop.)`;
       return;
     }
 
-    // Susun baris Excel: kolom umum + kolom indikator dgn nama sesuai
-    // excelCols (mengandung kata kunci yang dicari fitur_rekon.py).
-    const rowsExcel = rows.map((r) => {
-      const out = {
-        idtanaman: r.idtanaman,
-        namatanaman: r.namatanaman,
-        kab: r.kab,
-        nama_kab: r.nama_kab,
-        urutkec: r.urutkec,
-        kec: r.kec,
-        nama_kec: r.nama_kec,
-        tahun: r.tahun,
-        [cfg.periodeCol]: r[cfg.periodeCol],
-      };
-      for (const [dbCol, headerExcel] of Object.entries(cfg.excelCols)) {
-        out[headerExcel] = r[dbCol] ?? 0;
-      }
-      return out;
-    });
+    const namaFile = jenisPilihan === "semua"
+      ? `SemuaSPH_${labelKabFile}_${tahun}.xlsx`
+      : `${SPH_CONFIG[jenisPilihan].label}_${labelKabFile}_${tahun}.xlsx`;
 
-    const ws = XLSX.utils.json_to_sheet(rowsExcel);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, namaFile, { cellStyles: true });
 
-    const labelKab = kabNama ?? "SemuaKab";
-    const namaFile = `${cfg.label}_${labelKab.replace(/\s+/g, "")}_${tahun}.xlsx`;
-    XLSX.writeFile(wb, namaFile);
+    // Catatan pemakaian di aplikasi desktop cuma relevan utk role "prov"
+    // (yang juga pegang aplikasi desktop utk bikin Excel rekon dinamis).
+    // Kabkot cukup tahu file-nya sudah jadi, tanpa embel-embel itu.
+    const catatanDesktop = state.profile.role === "prov"
+      ? `\nFile ini bisa langsung dipakai di aplikasi desktop FetSipedas ` +
+        `(menu "3. Rekonsiliasi" → Pilih File Raw) untuk membuat Excel ` +
+        `rekon dinamis (dengan dropdown & grafik).`
+      : "";
 
     logBox.textContent =
-      `✓ Selesai! ${rows.length} baris diexport ke "${namaFile}".\n` +
-      `File ini bisa langsung dipakai di aplikasi desktop FetSipedas ` +
-      `(menu "3. Rekonsiliasi" → Pilih File Raw) untuk membuat Excel ` +
-      `rekon dinamis (dengan dropdown & grafik).`;
+      `✓ Selesai! ${totalRows} baris diexport ke "${namaFile}".\n` +
+      `${ringkasan.join("\n")}` +
+      catatanDesktop;
 
     await muatInfoTerakhir();
   } catch (e) {

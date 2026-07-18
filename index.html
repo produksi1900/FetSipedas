@@ -88,6 +88,7 @@
           <div class="field">
             <label>Jenis SPH</label>
             <select id="sel-jenis-download">
+              <option value="semua">— Semua SPH —</option>
               <option value="sbs">SPH-SBS</option>
               <option value="bst">SPH-BST</option>
               <option value="tbf">SPH-TBF</option>
@@ -107,7 +108,7 @@
 
           <button class="btn-login" id="btn-download" disabled>⬇ Download Data (Excel)</button>
           <div class="log-box" id="log-download">Data diambil dari database (hasil sinkronisasi terakhir dari aplikasi desktop).</div>
-          <div class="catatan-kecil">
+          <div class="catatan-kecil" id="catatan-download-desktop">
             File Excel hasil download ini bisa langsung dipakai di aplikasi
             desktop FetSipedas, menu "3. Rekonsiliasi" → Pilih File Raw →
             Hasilkan Excel Rekon (untuk versi Excel dengan dropdown &amp; grafik).
