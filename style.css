@@ -179,6 +179,15 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
   width: 100%; padding: 7px 8px; font-size: 14px;
   border: 1px solid #ccc; border-radius: 4px; background: var(--putih);
 }
+/* Ruang khusus kanan buat ikon panah dropdown bawaan browser, supaya
+   opsi dgn teks panjang (mis. "— Semua Kabupaten/Kota (Provinsi) —")
+   dipotong rapi jadi "..." dan tidak numpuk/nge-print di atas panahnya. */
+.field select {
+  padding-right: 24px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
 .field select:disabled { background: var(--abu2); color: #888; }
 
 .log-box {
@@ -249,6 +258,16 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 .rekon-slicer .field input {
   padding: 5px 6px; font-size: 12px;
 }
+/* Select butuh padding-kanan ekstra khusus supaya teks panjang (mis.
+   "— Semua Kabupaten/Kota (Provinsi) —") tidak numpuk sama ikon panah
+   dropdown bawaan browser -- dan dipotong "..." kalau tetap kepanjangan
+   drpd lebar kolomnya, bukan mentok/nge-print di atas panahnya. */
+.rekon-slicer .field select {
+  padding-right: 22px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
 /* Tombol "Download Rangkuman Excel" ikut menyusut kalau ruangnya sempit
    (bukan white-space:nowrap lagi -- lihat index.html), teksnya boleh
    wrap jadi 2 baris supaya tetap sebaris dgn 3 dropdown & tidak
@@ -267,12 +286,13 @@ button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor
 
 .tabel-blok { margin-bottom: 20px; background: var(--putih); border-radius: 6px; overflow: hidden; border: 1px solid #e0e0e0; }
 
-/* Scrollbar tipis DI ATAS tabel, disinkronkan (lewat JS) dengan scroll
-   asli tabel (.tabel-scroll) -- supaya bisa scroll ke kanan tanpa harus
-   scroll ke bawah dulu buat cari scrollbar di ujung tabel yang panjang. */
+/* Scrollbar tipis di ATAS tabel (disinkronkan via JS dgn .tabel-scroll)
+   sekarang disembunyikan atas permintaan -- cukup scrollbar horizontal
+   bawaan di bawah tabel saja, sekalian ngirit tinggi supaya area tabel
+   lebih lega. JS (initScrollAtas) tetap boleh jalan seperti biasa, cuma
+   elemennya displaynya none jadi tidak makan tempat/tidak kelihatan. */
 .scroll-atas {
-  overflow-x: auto; overflow-y: hidden; height: 14px;
-  border-bottom: 1px solid #e0e0e0;
+  display: none;
 }
 .scroll-atas-dummy { height: 1px; }
 
