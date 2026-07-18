@@ -1243,6 +1243,7 @@ const XL_KUNING_JUDUL = "FFFFF176"; // judul tabel (sama dgn .tabel-judul bg)
 const XL_HIJAU_GROWTH = "FF1f9d6e"; // growth positif
 const XL_MERAH_GROWTH = "FFc0392b"; // growth negatif (--merah)
 const XL_TOTAL_BG     = "FFe8ede9"; // baris total (--abu2)
+const XL_ABU_STRIPE   = "FFf8f8f8"; // selang-seling baris genap (sama dgn tr:nth-child(even) di web)
 const XL_PUTIH        = "FFFFFFFF";
 
 function xlBorder() {
@@ -1341,10 +1342,14 @@ function tulisSheetRangkuman(wb, sheetName, cfg, rc, rowsIni, rowsLalu, jenis, t
 
   let dataRow = 2;
 
-  namaList.forEach((nama) => {
+  namaList.forEach((nama, iBaris) => {
     const d     = mapIni.get(nama);
     const dLalu = mapLalu.get(nama) || { tw: { 1: 0, 2: 0, 3: 0, 4: 0 }, bulan: {} };
     const { qtoq, yoy, ctoc } = hitungGrowthXl(d, dLalu);
+
+    // Baris ke-2, ke-4, dst (0-indexed: ganjil) dikasih background abu-abu
+    // tipis, sama seperti tr:nth-child(even) di tampilan web.
+    const stripeBg = iBaris % 2 === 1 ? XL_ABU_STRIPE : undefined;
 
     // Kumulatif untuk total
     const twNow = twTerakhirAdaData(d.tw);
@@ -1356,33 +1361,33 @@ function tulisSheetRangkuman(wb, sheetName, cfg, rc, rowsIni, rowsLalu, jenis, t
     totalKumulLalu += kumulLalu;
 
     let col = 0;
-    setCell(dataRow, col++, xlCell(d.idtanaman || "-", { align: "left" }));
-    setCell(dataRow, col++, xlCell(nama,               { align: "left" }));
-    setCell(dataRow, col++, xlCell(rc.satuan,          { align: "left" }));
+    setCell(dataRow, col++, xlCell(d.idtanaman || "-", { align: "left", bgColor: stripeBg }));
+    setCell(dataRow, col++, xlCell(nama,               { align: "left", bgColor: stripeBg }));
+    setCell(dataRow, col++, xlCell(rc.satuan,          { align: "left", bgColor: stripeBg }));
 
     if (pakaiBulan) {
       for (let b = 1; b <= 12; b++) {
         const v = d.bulan[b] || 0;
         totalBulan[b] += v;
-        setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00" }));
+        setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00", bgColor: stripeBg }));
       }
     }
     for (let t = 1; t <= 4; t++) {
       const v = d.tw[t] || 0;
       totalTw[t]   += v;
       totalTwLalu[t] += (dLalu.tw[t] || 0);
-      setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00" }));
+      setCell(dataRow, col++, xlCell(v === 0 ? null : v, { numFmt: "#,##0.00", bgColor: stripeBg }));
     }
 
     const jumlah = (d.tw[1]||0)+(d.tw[2]||0)+(d.tw[3]||0)+(d.tw[4]||0);
-    setCell(dataRow, col++, xlCell(jumlah === 0 ? null : jumlah, { numFmt: "#,##0.00" }));
+    setCell(dataRow, col++, xlCell(jumlah === 0 ? null : jumlah, { numFmt: "#,##0.00", bgColor: stripeBg }));
 
-    // Growth cells — warna sesuai nilai
+    // Growth cells — warna teks sesuai nilai (hijau naik / merah turun),
+    // tetap dikasih stripeBg biar background baris tetap konsisten.
     const growthCell = (v) => {
-      if (v === null) return xlCell("-");
+      if (v === null) return xlCell("-", { bgColor: stripeBg });
       const color = v > 0 ? XL_HIJAU_GROWTH : v < 0 ? XL_MERAH_GROWTH : undefined;
-      const c = xlCell(v, { numFmt: "#,##0.00", color });
-      return c;
+      return xlCell(v, { numFmt: "#,##0.00", color, bgColor: stripeBg });
     };
     setCell(dataRow, col++, growthCell(qtoq));
     setCell(dataRow, col++, growthCell(yoy));
