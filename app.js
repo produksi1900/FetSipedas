@@ -1111,7 +1111,7 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
       ({ qtoq, yoy, ctoc } = hitungGrowth(valNow, valPrevQ, valYoy, kumulIni, kumulLalu));
     }
 
-    let tds = `<td>${d.idtanaman || "-"}</td><td class="nama">${nama}</td><td>Kuintal</td>`;
+    let tds = `<td>${d.idtanaman || "-"}</td><td class="nama">${nama}</td><td>${rc.satuan}</td>`;
     if (pakaiBulan) {
       for (let b = 1; b <= 12; b++) {
         const v = d.bulan[b] || 0;
@@ -1162,7 +1162,7 @@ function renderRangkuman(cfg, rc, rowsIni, rowsLalu, jenis, tahun, kabPilihan) {
     <div class="tabel-blok">
       <div class="tabel-judul">
         <span>Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}</span>
-        <span class="satuan">Satuan: Kuintal · q-to-q, y-on-y &amp; c-to-c dalam %</span>
+        <span class="satuan">Satuan: ${rc.satuan} · q-to-q, y-on-y &amp; c-to-c dalam %</span>
       </div>
       <table class="tabel-rekon">
         <thead><tr>${kolomHead}</tr></thead>
@@ -1266,7 +1266,7 @@ function tulisSheetRangkuman(wb, sheetName, cfg, rc, rowsIni, rowsLalu, jenis, t
   };
 
   // ---- Baris 0: judul tabel ----
-  const judulTeks = `Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}  |  Satuan: Kuintal · q-to-q, y-on-y, c-to-c dalam %`;
+  const judulTeks = `Rangkuman Produksi ${cfg.label} — ${labelKab} — Tahun ${tahun}  |  Satuan: ${rc.satuan} · q-to-q, y-on-y, c-to-c dalam %`;
   setCell(0, 0, xlCell(judulTeks, { bold: true, bgColor: XL_KUNING_JUDUL, align: "left" }));
   for (let c = 1; c < nCol; c++) setCell(0, c, xlCell("", { bgColor: XL_KUNING_JUDUL }));
   ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nCol - 1 } }];
@@ -1307,7 +1307,7 @@ function tulisSheetRangkuman(wb, sheetName, cfg, rc, rowsIni, rowsLalu, jenis, t
     let col = 0;
     setCell(dataRow, col++, xlCell(d.idtanaman || "-", { align: "left" }));
     setCell(dataRow, col++, xlCell(nama,               { align: "left" }));
-    setCell(dataRow, col++, xlCell("Kuintal",          { align: "left" }));
+    setCell(dataRow, col++, xlCell(rc.satuan,          { align: "left" }));
 
     if (pakaiBulan) {
       for (let b = 1; b <= 12; b++) {

@@ -51,7 +51,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1, satuan: "Kuintal" },
   },
   tbf: {
     label: "SPH-TBF",
@@ -62,11 +62,11 @@ export const SPH_CONFIG = {
     tabs: [
       { key: "provitas_habis", label: "Provitas Habis", satuan: "Kw/Ha",
         numer: "produksi_habis", denom: "luas_panen_habis",
-        rawNumer: { label: "Produksi Habis", satuan: "Kuintal", factor: 1 },
+        rawNumer: { label: "Produksi Habis", satuan: "Kg", factor: 1 },
         rawDenom: { label: "Luas Panen Habis", satuan: "Ha", factor: 1 } },
       { key: "provitas_belum", label: "Provitas Belum Habis", satuan: "Kw/Ha",
         numer: "produksi_belum_habis", denom: "luas_panen_belum_habis",
-        rawNumer: { label: "Produksi Belum Habis", satuan: "Kuintal", factor: 1 },
+        rawNumer: { label: "Produksi Belum Habis", satuan: "Kg", factor: 1 },
         rawDenom: { label: "Luas Panen Belum Habis", satuan: "Ha", factor: 1 } },
       { key: "harga", label: "Harga Jual Petani", satuan: "Rp/Kg", single: "harga_jual_petani" },
     ],
@@ -81,7 +81,7 @@ export const SPH_CONFIG = {
       produksi_belum_habis:   "Produksi belum habis (Kg)",
       harga_jual_petani:      "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1, satuan: "Kg" },
   },
   th: {
     label: "SPH-TH",
@@ -92,7 +92,7 @@ export const SPH_CONFIG = {
     tabs: [
       { key: "provitas_habis", label: "Provitas Habis", satuan: "Kw/Ha",
         numer: "produksi_habis", denom: "luas_panen_habis",
-        rawNumer: { label: "Produksi Habis", satuan: "Kuintal", factor: 1 },
+        rawNumer: { label: "Produksi Habis", satuan: "Pohon", factor: 1 },
         rawDenom: { label: "Luas Panen Habis", satuan: "Ha", factor: 1 } },
       { key: "harga", label: "Harga Jual Petani", satuan: "Rp/Kg", single: "harga_jual_petani" },
     ],
@@ -109,7 +109,7 @@ export const SPH_CONFIG = {
       produksi_habis:     "Produksi Habis (Kg)",
       harga_jual_petani:  "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi_habis", factor: 1 },
+    rangkuman: { produksiCol: "produksi_habis", factor: 1, satuan: "Pohon" },
   },
   bst: {
     label: "SPH-BST",
@@ -141,7 +141,7 @@ export const SPH_CONFIG = {
       produksi:                "Produksi (Kuintal)",
       harga_jual_petani:       "Harga jual petani (Rp/kg)",
     },
-    rangkuman: { produksiCol: "produksi", factor: 1 },
+    rangkuman: { produksiCol: "produksi", factor: 1, satuan: "Kuintal" },
   },
 };
 
