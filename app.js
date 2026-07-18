@@ -1613,6 +1613,11 @@ async function downloadRangkumanExcel() {
 
     XLSX.writeFile(wb, namaFile, { bookSST: false, cellStyles: true });
     log.textContent = `✓ Selesai! ${wb.SheetNames.length} sheet (${wb.SheetNames.join(", ")}) → "${namaFile}"`;
+    // Pesan sukses otomatis hilang setelah beberapa detik supaya tidak
+    // nyangkut terus di layar walau usernya sudah pindah2 filter lain.
+    setTimeout(() => {
+      if (log.textContent.startsWith("✓ Selesai!")) log.textContent = "";
+    }, 6000);
   } catch (e) {
     log.textContent = `✗ Gagal: ${e.message}`;
   } finally {
