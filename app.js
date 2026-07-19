@@ -2354,17 +2354,33 @@ async function hapusTerpilihAnomali() {
 $("btn-buka-tambah-anomali")?.addEventListener("click", async () => {
   const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
-  const rowsSaatIni = $("anomali-area").querySelectorAll("tbody tr").length;
   const periodeTeks = `TW${twSekarang()} ${TAHUN_SEKARANG}`;
 
   try {
+    // PENTING: No urut baris baru WAJIB dihitung dari DATA ASLI di
+    // database utk kombinasi jenis+kab yang sedang aktif -- BUKAN dari
+    // jumlah <tr> yang kebetulan sedang tampil di #anomali-area. Kalau
+    // yang lagi tampil di layar itu tabel Dashboard Anomali (bukan
+    // daftar list), jumlah barisnya sama sekali tidak nyambung dgn
+    // jenis+kab yg aktif (bisa gabungan banyak kab & jenis lain), jadi
+    // no_urut yang dihasilkan jadi salah/meloncat (mis. jadi "10").
+    const rowsSaatIni = await fetchAllRows((from, to) =>
+      supabase.from("konfirmasi_anomali").select("id")
+        .eq("jenis", jenis).eq("kab_id", kabId)
+        .range(from, to)
+    );
+    const noUrutBaru = (rowsSaatIni?.length || 0) + 1;
+
     const { error } = await supabase.from("konfirmasi_anomali").insert({
       jenis, kab_id: kabId,
-      no_urut: rowsSaatIni + 1,
+      no_urut: noUrutBaru,
       periode_teks: periodeTeks,
       nama_komoditi: "", kalimat_anomali: "",
     });
     if (error) throw error;
+    // muatAnomali() otomatis balik menampilkan daftar list (bukan
+    // Dashboard) -- supaya baris yang baru ditambah langsung kelihatan
+    // & bisa langsung diisi.
     await muatAnomali();
   } catch (e) {
     alert("Gagal menambah baris: " + e.message);
@@ -2732,11 +2748,13 @@ async function bukaDashboardAnomali() {
   renderDashboardAnomali(rows, kabList);
 }
 
-// Format "count (pct%)" -- kalau total 0, persentase ditampilkan "-"
-// supaya tidak muncul NaN%.
+// Format "count (pct%)" -- ditulis SATU BARIS (persen di dalam kurung
+// di samping angka, bukan di baris bawahnya) supaya baris tabel lebih
+// ngepas/rapat. Kalau total 0, persentase ditampilkan "-" supaya tidak
+// muncul NaN%.
 function fmtCountPct(count, total) {
   const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0.0";
-  return `${count}<span class="pct">${pct}%</span>`;
+  return `${count}<span class="pct">(${pct}%)</span>`;
 }
 
 function renderDashboardAnomali(rows, kabList) {

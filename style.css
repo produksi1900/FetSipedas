@@ -218,14 +218,18 @@ body { display: flex; flex-direction: column; }
 .toggle-btn.aktif { background: var(--hijau-tua); border-color: var(--hijau-tua); color: var(--putih); }
 
 /* ---------- Rekon ---------- */
-/* view-rekon & view-rangkuman jadi flex column yang mengisi sisa tinggi
-   panel kanan: slicer & tab-bar (flex-shrink default) tetap "freeze" di
-   atas, sedangkan #rekon-area/#rangkuman-area (flex:1) yang discroll. */
-#view-rekon:not(.hidden), #view-rangkuman:not(.hidden) {
+/* view-rekon, view-rangkuman & view-anomali jadi flex column yang
+   mengisi sisa tinggi panel kanan: slicer & toolbar (flex-shrink
+   default) tetap "freeze" di atas, sedangkan #rekon-area/#rangkuman-area/
+   #anomali-area (flex:1) yang discroll. Sebelumnya #view-anomali &
+   #anomali-area TIDAK ikut aturan ini (kelupaan), akibatnya konten yang
+   lebih tinggi dari sisa layar (terutama tabel Dashboard Anomali) malah
+   KEPOTONG oleh .panel-kanan yang overflow:hidden -- bukan discroll. */
+#view-rekon:not(.hidden), #view-rangkuman:not(.hidden), #view-anomali:not(.hidden) {
   display: flex; flex-direction: column;
   flex: 1; min-height: 0;
 }
-#rekon-area, #rangkuman-area {
+#rekon-area, #rangkuman-area, #anomali-area {
   flex: 1; min-height: 0;
   overflow-y: auto;
   padding-right: 2px; /* kasih sedikit jarak dari scrollbar */
@@ -450,8 +454,8 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
      cuma dipakai di layout desktop yang punya tinggi viewport tetap. */
   .panel-kanan { overflow: visible; padding: 10px; display: block; }
   #panel-rekon { display: block; flex: none; }
-  #view-rekon:not(.hidden), #view-rangkuman:not(.hidden) { display: block; flex: none; }
-  #rekon-area, #rangkuman-area { overflow-y: visible; flex: none; padding-right: 0; }
+  #view-rekon:not(.hidden), #view-rangkuman:not(.hidden), #view-anomali:not(.hidden) { display: block; flex: none; }
+  #rekon-area, #rangkuman-area, #anomali-area { overflow-y: visible; flex: none; padding-right: 0; }
 
   .header {
     height: auto; flex-wrap: wrap; padding: 8px 12px; row-gap: 4px;
@@ -614,7 +618,7 @@ table.tabel-dashboard-anomali {
   border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px;
 }
 table.tabel-dashboard-anomali th, table.tabel-dashboard-anomali td {
-  border: 1px solid #ddd; padding: 7px 9px; text-align: center;
+  border: 1px solid #ddd; padding: 5px 9px; text-align: center;
   background-color: var(--putih); white-space: nowrap;
 }
 table.tabel-dashboard-anomali th {
@@ -625,13 +629,23 @@ table.tabel-dashboard-anomali td.nama {
   background-color: #f4f9f6;
 }
 table.tabel-dashboard-anomali td.sph-cell { text-align: left; }
+/* Persentase ditaruh SEBIJI baris sama jumlahnya (inline, dlm kurung),
+   bukan di baris baru di bawahnya -- lebih hemat tempat & baris jadi
+   lebih ngepas/rapat (dulu tiap sel makan 2 baris tinggi gara2 .pct
+   display:block). */
 table.tabel-dashboard-anomali .pct {
-  display: block; font-size: 11px; color: #888; font-weight: normal;
+  display: inline; font-size: 11px; color: #888; font-weight: normal; margin-left: 3px;
 }
+/* Baris TOTAL provinsi (paling bawah) -- dibuat sticky nempel di bawah
+   area scroll, supaya kondisi total tetap kelihatan kapan pun tanpa
+   harus scroll penuh ke ujung bawah. */
 table.tabel-dashboard-anomali tr.baris-total-dashboard td {
   background-color: var(--abu2); font-weight: bold;
+  position: sticky; bottom: 0; z-index: 2;
 }
+/* Kolom "Kabupaten" (freeze pakai rowspan) ikut digelapin dikit biar
+   beda dgn baris data biasa waktu ketiban baris TOTAL di sebelahnya. */
 .dashboard-anomali-scroll {
-  overflow-x: auto; max-height: 65vh; overflow-y: auto;
+  overflow-x: auto;
   border: 1px solid #e0e0e0; border-radius: 6px;
 }
