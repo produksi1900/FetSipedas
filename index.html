@@ -201,13 +201,14 @@
             <button class="btn-login btn-kecil" id="btn-buka-tambah-anomali">+ Tambah Baris</button>
             <label class="btn-login btn-kecil btn-file-label" for="in-file-anomali">⬆ Upload Excel</label>
             <input type="file" id="in-file-anomali" accept=".xlsx,.xls" class="hidden-file-input">
-            <button class="btn-login btn-kecil" id="btn-download-anomali">⬇ Download Excel</button>
+            <button class="btn-login btn-kecil" id="btn-download-anomali">⬇ Download Excel (Semua SPH)</button>
+            <button class="btn-login btn-kecil btn-bahaya" id="btn-hapus-terpilih-anomali">🗑 Hapus Terpilih</button>
             <button class="btn-login btn-kecil btn-bahaya" id="btn-buka-hapus-anomali">🗑 Hapus Semua Anomali</button>
             <div class="anomali-toolbar-spacer"></div>
             <button class="btn-login btn-kecil" id="btn-buka-dashboard-anomali">📊 Dashboard Anomali</button>
           </div>
           <div class="anomali-toolbar" id="anomali-toolbar-kabkot">
-            <button class="btn-login btn-kecil" id="btn-download-anomali-kabkot">⬇ Download Excel</button>
+            <button class="btn-login btn-kecil" id="btn-download-anomali-kabkot">⬇ Download Excel (Semua SPH)</button>
             <div class="anomali-toolbar-spacer"></div>
             <button class="btn-login btn-kecil" id="btn-buka-dashboard-anomali-kabkot">📊 Dashboard Anomali</button>
           </div>
@@ -220,26 +221,13 @@
           <div class="modal-overlay hidden" id="modal-hapus-anomali">
             <div class="modal-box">
               <div class="modal-title">
-                Hapus Semua Data Anomali?
+                Hapus SEMUA Data Anomali (Semua SPH & Kabupaten)?
                 <button type="button" class="modal-close" id="btn-tutup-hapus-anomali">✕</button>
               </div>
               <p class="modal-teks" id="teks-konfirmasi-hapus-anomali"></p>
               <button class="btn-login" id="btn-backup-lalu-hapus-anomali">⬇ Download Backup Excel, lalu Hapus</button>
               <button class="btn-login btn-bahaya" id="btn-konfirmasi-hapus-anomali">🗑 Hapus Semua (Tanpa Backup)</button>
               <button class="btn-login btn-batal" id="btn-batal-hapus-anomali">Batal</button>
-            </div>
-          </div>
-
-          <!-- ===== POPUP: DASHBOARD ANOMALI ===== -->
-          <div class="modal-overlay hidden" id="modal-dashboard-anomali">
-            <div class="modal-box modal-box-lebar">
-              <div class="modal-title">
-                Dashboard Anomali
-                <button type="button" class="modal-close" id="btn-tutup-dashboard-anomali">✕</button>
-              </div>
-              <div id="dashboard-anomali-isi">
-                <div class="placeholder-kosong">⏳ Memuat data...</div>
-              </div>
             </div>
           </div>
         </div>

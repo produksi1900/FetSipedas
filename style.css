@@ -515,6 +515,9 @@ table.tabel-anomali th.th-sortable:hover { background-color: var(--hijau-tua); }
 table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
   text-align: center; width: 42px; min-width: 42px; white-space: nowrap;
 }
+table.tabel-anomali td.col-chk, table.tabel-anomali th.col-chk {
+  text-align: center; width: 30px; min-width: 30px; white-space: nowrap;
+}
 table.tabel-anomali td.col-bulan, table.tabel-anomali th.col-bulan {
   width: 92px; min-width: 84px; white-space: nowrap;
 }
@@ -599,23 +602,37 @@ td.col-hapus { text-align: center; width: 34px; }
 /* ---------- Toolbar Anomali: dorong tombol dashboard ke kanan ---------- */
 .anomali-toolbar-spacer { flex: 1; }
 
-/* ---------- Dashboard Anomali ---------- */
-.modal-box-lebar {
-  max-width: 860px;
-  max-height: 85vh;
-  overflow-y: auto;
+/* ---------- Dashboard Anomali (tampil INLINE menggantikan tabel list,
+   bukan popup lagi) ---------- */
+.dashboard-anomali-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+}
+.dashboard-anomali-header h3 {
+  margin: 0; font-size: 16px; color: var(--hijau-tua);
 }
 table.tabel-dashboard-anomali {
   border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px;
 }
 table.tabel-dashboard-anomali th, table.tabel-dashboard-anomali td {
-  border: 1px solid #ddd; padding: 6px 8px; text-align: center;
+  border: 1px solid #ddd; padding: 7px 9px; text-align: center;
   background-color: var(--putih); white-space: nowrap;
 }
 table.tabel-dashboard-anomali th {
-  background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0;
+  background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 2;
 }
-table.tabel-dashboard-anomali td.nama { text-align: left; font-weight: bold; }
+table.tabel-dashboard-anomali td.nama {
+  text-align: left; font-weight: bold; vertical-align: middle;
+  background-color: #f4f9f6;
+}
+table.tabel-dashboard-anomali td.sph-cell { text-align: left; }
+table.tabel-dashboard-anomali .pct {
+  display: block; font-size: 11px; color: #888; font-weight: normal;
+}
 table.tabel-dashboard-anomali tr.baris-total-dashboard td {
   background-color: var(--abu2); font-weight: bold;
+}
+.dashboard-anomali-scroll {
+  overflow-x: auto; max-height: 65vh; overflow-y: auto;
+  border: 1px solid #e0e0e0; border-radius: 6px;
 }
