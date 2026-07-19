@@ -1776,6 +1776,88 @@ function renderAnomaliSorted() {
   renderAnomali(rowsSorted);
 }
 
+// Baca nilai kolom LANGSUNG dari isi yang sedang tampil di DOM (bukan dari
+// cache state.anomaliRows) -- supaya sort selalu akurat sesuai apa yang
+// benar-benar dilihat user saat ini, termasuk isian yang baru saja
+// diketik/dipilih tapi belum tentu "settle" di cache.
+function nilaiKolomDariBarisAnomali(tr, kolom) {
+  const tds = tr.children;
+  switch (kolom) {
+    case "no_urut": {
+      const txt = (tds[0]?.textContent || "").trim();
+      return txt === "" ? null : Number(txt);
+    }
+    case "bulan": {
+      const input = tds[1]?.querySelector(".combo-input");
+      const txt = (input ? input.value : tds[1]?.textContent || "").trim();
+      const idx = BULAN_SINGKAT_ANOMALI.indexOf(txt);
+      return idx >= 0 ? idx + 1 : null;
+    }
+    case "nama_komoditi": {
+      const input = tds[2]?.querySelector(".combo-input");
+      return (input ? input.value : tds[2]?.textContent || "").trim();
+    }
+    case "kalimat_anomali":
+      return (tds[3]?.textContent || "").trim();
+    case "konfirmasi_kabkot":
+      return (tds[4]?.textContent || "").trim();
+    case "approval_provinsi": {
+      const sel = tds[5]?.querySelector("select");
+      return (sel ? sel.value : tds[5]?.textContent || "").trim();
+    }
+    default:
+      return "";
+  }
+}
+
+function bandingkanNilaiAnomali(va, vb, tipe, arah) {
+  if (tipe === "angka") {
+    const na = va === null || va === undefined;
+    const nb = vb === null || vb === undefined;
+    if (na && nb) return 0;
+    if (na) return 1;
+    if (nb) return -1;
+    return arah === "asc" ? va - vb : vb - va;
+  }
+  const sa = String(va ?? "").toLowerCase();
+  const sb = String(vb ?? "").toLowerCase();
+  const cmp = sa.localeCompare(sb, "id");
+  return arah === "asc" ? cmp : -cmp;
+}
+
+// Urutkan ulang baris <tr> yang SUDAH ADA di tabel Anomali dengan
+// memindah posisinya di DOM (appendChild pada node yang sama memindah,
+// bukan membuat ulang) -- input/select/isi yang sedang tampil di layar
+// jadi TIDAK PERNAH ikut dibuat ulang atau hilang saat sort diklik.
+function urutkanBarisAnomaliDiDom(kolom, arah) {
+  const tbody = document.querySelector("#anomali-area table.tabel-anomali tbody");
+  if (!tbody) return;
+  const info = KOLOM_ANOMALI_SORTABLE.find((k) => k.key === kolom);
+  const tipe = info ? info.tipe : "teks";
+  const trs = Array.from(tbody.children);
+  trs.sort((ta, tb) => {
+    const va = nilaiKolomDariBarisAnomali(ta, kolom);
+    const vb = nilaiKolomDariBarisAnomali(tb, kolom);
+    return bandingkanNilaiAnomali(va, vb, tipe, arah);
+  });
+  trs.forEach((tr) => tbody.appendChild(tr));
+}
+
+// Update teks header (label + panah ▲▼) sesuai kolom/arah sort aktif,
+// tanpa menyentuh <tbody> sama sekali.
+function perbaruiLabelHeaderAnomali() {
+  const table = document.querySelector("#anomali-area table.tabel-anomali");
+  if (!table) return;
+  const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
+  const labelKab = labelKabAnomaliAktif();
+  const labelKolom = { no_urut: "No", bulan: "Bulan", nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  table.querySelectorAll("thead th.th-sortable").forEach((th) => {
+    const key = th.dataset.kolom;
+    const panah = kolomAktif === key ? (arahAktif === "asc" ? " ▲" : " ▼") : "";
+    th.textContent = (labelKolom[key] ?? "") + panah;
+  });
+}
+
 // Buat td dropdown Bulan -- SEKARANG bebas pilih semua 12 bulan (tidak
 // dibatasi ke TW tertentu lagi), dan sekarang jadi combobox ketik+cari
 // (bukan <select> native) -- alasan sama kayak Komoditi: <select> browser
@@ -2030,6 +2112,7 @@ function renderAnomali(rows) {
   KOLOM_ANOMALI_SORTABLE.forEach(({ key, tipe }) => {
     const th = document.createElement("th");
     th.className = "th-sortable" + (clsExtra[key] ? " " + clsExtra[key] : "");
+    th.dataset.kolom = key;
     const panah = kolomAktif === key ? (arahAktif === "asc" ? " ▲" : " ▼") : "";
     th.textContent = labelKolom[key] + panah;
     th.addEventListener("click", () => {
@@ -2038,7 +2121,16 @@ function renderAnomali(rows) {
       } else {
         state.anomaliSort = { kolom: key, arah: "asc" };
       }
-      renderAnomaliSorted();
+      // PENTING: sort di sini TIDAK membangun ulang tabel dari cache
+      // (state.anomaliRows) -- itu penyebab data yang baru saja
+      // diketik/dipilih tapi belum "settle" di cache jadi kelihatan
+      // hilang. Sebagai gantinya, baris <tr> yang SUDAH ADA di layar
+      // cukup dipindah urutannya di DOM (tanpa dibuat ulang), dan
+      // nilai pembanding dibaca LANGSUNG dari isian yang sedang
+      // tampil di layar -- jadi apa pun yang sedang ditampilkan
+      // (termasuk yang belum sempat tersimpan) tidak pernah hilang.
+      urutkanBarisAnomaliDiDom(state.anomaliSort.kolom, state.anomaliSort.arah);
+      perbaruiLabelHeaderAnomali();
     });
     trHead.appendChild(th);
   });
