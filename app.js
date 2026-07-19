@@ -2456,52 +2456,102 @@ $("btn-backup-lalu-hapus-anomali")?.addEventListener("click", async () => {
   }
 });
 
-// ---- Upload Excel (khusus prov): kolom Periode, No, Nama Komoditi, Kalimat Anomali ----
+// ---- Upload Excel (khusus prov): boleh berisi 1 s.d. 4 tab sheet
+// SEKALIGUS dalam satu file, satu tab per Jenis SPH -- nama tab
+// dicocokkan ke label Jenis SPH ("SPH-SBS"/"SPH-BST"/"SPH-TBF"/"SPH-TH")
+// ATAU singkatannya ("sbs"/"bst"/"tbf"/"th"), tidak peka besar/kecil
+// huruf. Tab yang namanya tidak dikenali otomatis DILEWATI -- jadi kalau
+// filenya cuma ada 1, 2, atau 3 tab yang valid, itu tetap jalan normal
+// (tidak wajib 4 tab lengkap). Jenis SPH tiap baris DITENTUKAN DARI NAMA
+// TAB-nya sendiri, BUKAN dari dropdown "Jenis SPH" yang sedang dipilih
+// di layar -- kolom Periode, No, Nama Komoditi, Kalimat Anomali.
 $("in-file-anomali")?.addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
 
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rowsSheet = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    const daftar = rowsSheet.map((row, i) => {
-      const bulanRaw = String(row["Bulan"] ?? row.bulan ?? "").trim();
-      // Kolom "Bulan" di Excel bisa berisi angka (1-12), nama bulan penuh
-      // ("Februari", sesuai NAMA_BULAN yg dipakai saat export), atau
-      // singkatan ("Feb", sesuai BULAN_SINGKAT_ANOMALI) -- coba ketiganya.
-      let bulanVal = null;
-      if (bulanRaw !== "") {
-        const angka = Number(bulanRaw);
-        if (!Number.isNaN(angka) && angka >= 1 && angka <= 12) {
-          bulanVal = angka;
-        } else {
-          const idxPenuh = NAMA_BULAN.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
-          const idxSingkat = BULAN_SINGKAT_ANOMALI.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
-          if (idxPenuh > 0) bulanVal = idxPenuh; // NAMA_BULAN index 0 = "" (kosong), jadi index = nomor bulan
-          else if (idxSingkat >= 0) bulanVal = idxSingkat + 1;
+    const daftarPerJenis = {}; // jenis -> array baris siap insert (no_urut belum diisi)
+    const sheetTakDikenali = [];
+
+    for (const sheetName of wb.SheetNames) {
+      const kunci = sheetName.trim().toLowerCase();
+      const jenis = JENIS_LIST_DASHBOARD.find(
+        (j) => SPH_CONFIG[j].label.toLowerCase() === kunci || j === kunci
+      );
+      if (!jenis) { sheetTakDikenali.push(sheetName); continue; }
+
+      const rowsSheet = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: "" });
+      const daftar = rowsSheet.map((row) => {
+        const bulanRaw = String(row["Bulan"] ?? row.bulan ?? "").trim();
+        // Kolom "Bulan" di Excel bisa berisi angka (1-12), nama bulan penuh
+        // ("Februari", sesuai NAMA_BULAN yg dipakai saat export), atau
+        // singkatan ("Feb", sesuai BULAN_SINGKAT_ANOMALI) -- coba ketiganya.
+        let bulanVal = null;
+        if (bulanRaw !== "") {
+          const angka = Number(bulanRaw);
+          if (!Number.isNaN(angka) && angka >= 1 && angka <= 12) {
+            bulanVal = angka;
+          } else {
+            const idxPenuh = NAMA_BULAN.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
+            const idxSingkat = BULAN_SINGKAT_ANOMALI.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
+            if (idxPenuh > 0) bulanVal = idxPenuh; // NAMA_BULAN index 0 = "" (kosong), jadi index = nomor bulan
+            else if (idxSingkat >= 0) bulanVal = idxSingkat + 1;
+          }
         }
-      }
-      return {
-        jenis, kab_id: kabId,
-        no_urut: Number(row.No ?? row.no ?? i + 1) || (i + 1),
-        bulan: bulanVal,
-        nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
-        kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
-      };
-    }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
+        return {
+          jenis, kab_id: kabId,
+          bulan: bulanVal,
+          nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
+          kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
+        };
+      }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
 
-    if (daftar.length === 0) {
-      alert("Tidak ada baris valid di file Excel. Pastikan ada kolom 'No', 'Bulan', 'Nama Komoditi', 'Kalimat Anomali'.");
+      if (daftar.length > 0) daftarPerJenis[jenis] = daftar;
+    }
+
+    const jenisTerisi = Object.keys(daftarPerJenis);
+    if (jenisTerisi.length === 0) {
+      alert(
+        "Tidak ada baris valid utk diupload.\n" +
+        "Pastikan nama tab sheet sesuai Jenis SPH (SPH-SBS/SPH-BST/SPH-TBF/SPH-TH, " +
+        "atau singkatannya sbs/bst/tbf/th), dan tiap baris ada isi Nama Komoditi / Kalimat Anomali."
+      );
       return;
     }
 
-    const { error } = await supabase.from("konfirmasi_anomali").insert(daftar);
+    // No urut baris baru disambung dari JUMLAH BARIS YANG SUDAH ADA di
+    // database utk tiap kombinasi jenis+kab (bukan asal pakai kolom "No"
+    // di Excel -- itu rawan bentrok/duplikat sama baris yang sudah ada).
+    let semuaBaris = [];
+    const ringkasan = [];
+    for (const jenis of jenisTerisi) {
+      const rowsSaatIni = await fetchAllRows((from, to) =>
+        supabase.from("konfirmasi_anomali").select("id")
+          .eq("jenis", jenis).eq("kab_id", kabId)
+          .range(from, to)
+      );
+      let noUrut = rowsSaatIni?.length || 0;
+      const daftar = daftarPerJenis[jenis].map((r) => {
+        noUrut += 1;
+        return { ...r, no_urut: noUrut };
+      });
+      semuaBaris = semuaBaris.concat(daftar);
+      ringkasan.push(`${SPH_CONFIG[jenis].label}: ${daftar.length} baris`);
+    }
+
+    const { error } = await supabase.from("konfirmasi_anomali").insert(semuaBaris);
     if (error) throw error;
+
+    let pesan = `✓ Berhasil menambah ${semuaBaris.length} baris anomali.\n${ringkasan.join("\n")}`;
+    if (sheetTakDikenali.length > 0) {
+      pesan += `\n\nTab dilewati (nama tidak dikenali sbg Jenis SPH): ${sheetTakDikenali.join(", ")}`;
+    }
+    alert(pesan);
+
     await muatAnomali();
   } catch (err) {
     alert("Gagal upload Excel: " + err.message);
@@ -2787,6 +2837,7 @@ function renderDashboardAnomali(rows, kabList) {
   // ---- Susun baris per kab (kumpulkan dulu semua baris jenis yg
   // datanya > 0, supaya tahu berapa rowspan utk sel Kabupaten) ----
   let bodyRows = "";
+  let grupKeIdx = 0; // dinaikkan tiap pindah ke kabupaten baru -- dipakai utk selang-seling warna PER KELOMPOK kab (bukan per baris), biar batas antar kabupaten kelihatan jelas
 
   for (const kab of kabList) {
     const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kab);
@@ -2794,6 +2845,9 @@ function renderDashboardAnomali(rows, kabList) {
 
     const jenisTerisi = JENIS_LIST_DASHBOARD.filter((jenis) => map.get(`${kab}|${jenis}`).total > 0);
     if (jenisTerisi.length === 0) continue; // kab ini belum ada anomali sama sekali di semua SPH
+
+    const clsGrup = grupKeIdx % 2 === 1 ? " grup-abu" : "";
+    grupKeIdx++;
 
     jenisTerisi.forEach((jenis, idx) => {
       const s = map.get(`${kab}|${jenis}`);
@@ -2812,7 +2866,13 @@ function renderDashboardAnomali(rows, kabList) {
         ? `<td class="nama" rowspan="${jenisTerisi.length}">${labelKab}</td>`
         : "";
 
-      bodyRows += `<tr>
+      // "baris-mulai-kab" dikasih ke baris PERTAMA tiap kabupaten --
+      // dipakai buat garis atas lebih tebal, jadi batas antar kabupaten
+      // kelihatan tegas walau warnanya kebetulan sama (kab ganjil vs
+      // ganjil berikutnya).
+      const clsMulai = idx === 0 ? " baris-mulai-kab" : "";
+
+      bodyRows += `<tr class="${clsGrup}${clsMulai}">
         ${tdKab}
         <td class="sph-cell">${SPH_CONFIG[jenis].label}</td>
         <td>${s.total}</td>

@@ -629,6 +629,23 @@ table.tabel-dashboard-anomali td.nama {
   background-color: #f4f9f6;
 }
 table.tabel-dashboard-anomali td.sph-cell { text-align: left; }
+/* Pemisah antar KELOMPOK KABUPATEN (bukan per baris) -- tiap kabupaten
+   genap/ganjil (urutan tampil) dikasih warna latar selang-seling abu2
+   muda vs putih, SEMUA sel dalam grup itu ikut (termasuk sel Kabupaten
+   yang di-rowspan), supaya batas antar kabupaten kelihatan jelas walau
+   sebelumnya cuma beda garis tipis antar baris. */
+table.tabel-dashboard-anomali tr.grup-abu td {
+  background-color: #f3f6f4;
+}
+table.tabel-dashboard-anomali tr.grup-abu td.nama {
+  background-color: #e9f2ee;
+}
+/* Garis atas lebih tebal di baris PERTAMA tiap kabupaten baru -- jadi
+   batasnya tetap tegas dilihat walau warna latar kebetulan sama dgn
+   kabupaten sebelumnya (mis. kab ganjil ke-1 vs kab ganjil ke-3, dst). */
+table.tabel-dashboard-anomali tr.baris-mulai-kab td {
+  border-top: 2px solid var(--hijau-tua);
+}
 /* Persentase ditaruh SEBIJI baris sama jumlahnya (inline, dlm kurung),
    bukan di baris baru di bawahnya -- lebih hemat tempat & baris jadi
    lebih ngepas/rapat (dulu tiap sel makan 2 baris tinggi gara2 .pct
@@ -641,6 +658,7 @@ table.tabel-dashboard-anomali .pct {
    harus scroll penuh ke ujung bawah. */
 table.tabel-dashboard-anomali tr.baris-total-dashboard td {
   background-color: var(--abu2); font-weight: bold;
+  border-top: 2px solid var(--hijau-tua);
   position: sticky; bottom: 0; z-index: 2;
 }
 /* Kolom "Kabupaten" (freeze pakai rowspan) ikut digelapin dikit biar
