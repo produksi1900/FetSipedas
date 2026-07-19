@@ -2501,8 +2501,13 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
 $("btn-download-anomali")?.addEventListener("click", downloadAnomaliExcel);
 $("btn-download-anomali-kabkot")?.addEventListener("click", downloadAnomaliExcel);
 
-const ANOMALI_HEADERS = ["No", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
-const ANOMALI_COL_WIDTHS = [{ wch: 6 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
+// Kolom "ID" WAJIB ada di posisi pertama -- ini id unik (primary key) dari
+// database, dipakai sebagai kunci pencocokan saat kabkot mengupload balik
+// file ini utk mengisi "Konfirmasi Kabkot" (lihat uploadKonfirmasiKabkot()).
+// JANGAN diubah/dihapus user, dan JANGAN dipakai utk baris baru yang
+// ditambah manual di Excel (baris tanpa ID otomatis dilewati saat upload).
+const ANOMALI_HEADERS = ["ID", "No", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
+const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
 
 // Helper: tulis 1 sheet Anomali dari array rows (dipakai baik utk
 // download per-kab-semua-SPH maupun backup-semua-data-global).
@@ -2516,10 +2521,10 @@ function tulisSheetAnomaliDariRows(wb, sheetName, rows) {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
     const bulanLabel = r.bulan ? (NAMA_BULAN[r.bulan] || r.bulan) : "";
     const vals = [
-      r.no_urut, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.id, r.no_urut, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
       r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
     ];
-    vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c === 0 ? "center" : "left", bgColor: stripeBg })));
+    vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c <= 1 ? "center" : "left", bgColor: stripeBg })));
   });
 
   ws["!ref"] = XLSX.utils.encode_range(range);
@@ -2561,6 +2566,94 @@ async function downloadAnomaliExcel() {
   XLSX.writeFile(wb, `KonfirmasiAnomali_${labelKab}.xlsx`, { cellStyles: true });
   return true;
 }
+
+// ---- Upload Konfirmasi Excel (khusus kabkot): kebalikan dari download
+// di atas -- kabkot boleh kerja offline dulu di file "KonfirmasiAnomali_
+// ....xlsx" hasil download (isi kolom "Konfirmasi Kabkot" per tab sheet
+// jenis SPH: SPH-SBS/SPH-BST/SPH-TBF/SPH-TH), lalu upload balik file
+// yang sama di sini.
+//
+// Pencocokan baris PAKAI KOLOM "ID" (bukan posisi baris / No / nama
+// komoditi) -- ID ini id asli dari database yang sudah tertulis otomatis
+// tiap baris saat didownload (lihat tulisSheetAnomaliDariRows). Ini
+// supaya:
+//  - Baris tidak pernah "kepasang" ke anomali lain gara2 urutan Excel
+//    beda/ke-sort/ada baris disisipkan manual.
+//  - Kalau ternyata Provinsi SUDAH MENGHAPUS anomali itu duluan sebelum
+//    kabkot sempat upload, ID-nya otomatis tidak ketemu lagi di database
+//    -- baris itu dilewati begitu saja (aman, tidak nyasar mengisi
+//    konfirmasi ke anomali lain), dan dilaporkan di ringkasan akhir.
+// Baris yang ditambah manual di Excel tanpa isi kolom ID (mis. kabkot
+// nulis baris baru sendiri) juga otomatis dilewati -- fitur ini cuma
+// utk MENGISI KONFIRMASI baris yang sudah ada, bukan menambah baris baru
+// (utk itu tetap lewat tombol "+ Tambah Baris" / upload Provinsi).
+async function uploadKonfirmasiKabkotExcel(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+
+    let totalDicoba = 0, diupdate = 0, dilewati = 0;
+
+    for (const sheetName of wb.SheetNames) {
+      // Cocokkan nama tab sheet ke jenis SPH -- terima baik nama tab
+      // persis label ("SPH-SBS") maupun singkat ("sbs", tidak peka
+      // besar/kecil huruf), supaya tetap jalan walau tabnya sempat
+      // diganti nama oleh user.
+      const kunciSheet = sheetName.trim().toLowerCase();
+      const jenis = JENIS_LIST_DASHBOARD.find(
+        (j) => SPH_CONFIG[j].label.toLowerCase() === kunciSheet || j === kunciSheet
+      );
+      if (!jenis) continue; // tab tidak dikenali -> lewati, bukan tab SPH
+
+      const rowsSheet = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: "" });
+      for (const row of rowsSheet) {
+        const idRaw = row["ID"] ?? row["Id"] ?? row.id ?? "";
+        const id = Number(idRaw);
+        if (!idRaw || Number.isNaN(id)) continue; // baris tanpa ID (baris baru manual) -> lewati
+
+        totalDicoba++;
+        const konfirmasiBaru = String(row["Konfirmasi Kabkot"] ?? "").trim();
+
+        const { data, error } = await supabase
+          .from("konfirmasi_anomali")
+          .update({ konfirmasi_kabkot: konfirmasiBaru })
+          .eq("id", id)
+          .select("id");
+
+        if (error || !data || data.length === 0) {
+          dilewati++; // ID tidak ketemu (kemungkinan sudah dihapus Provinsi) atau gagal
+          continue;
+        }
+        diupdate++;
+      }
+    }
+
+    if (totalDicoba === 0) {
+      alert(
+        "Tidak ada baris dengan kolom ID yang bisa diproses.\n" +
+        "Pastikan file yang diupload adalah hasil download dari tombol " +
+        "\"Download Excel (Semua SPH)\" (kolom ID jangan dihapus/diubah)."
+      );
+      return;
+    }
+
+    let pesan = `✓ Upload konfirmasi selesai.\n${diupdate} baris berhasil diupdate.`;
+    if (dilewati > 0) {
+      pesan += `\n${dilewati} baris dilewati (kemungkinan anomali itu sudah dihapus Provinsi, jadi diabaikan -- tidak perlu dimasukkan lagi).`;
+    }
+    alert(pesan);
+
+    await muatAnomali();
+  } catch (err) {
+    alert("Gagal upload Excel: " + err.message);
+  } finally {
+    e.target.value = "";
+  }
+}
+$("in-file-konfirmasi-kabkot")?.addEventListener("change", uploadKonfirmasiKabkotExcel);
 
 // ---- Backup Global (dipakai sebelum "Hapus Semua Anomali"): mengambil
 // SEMUA baris dari SEMUA jenis SPH & SEMUA kabupaten sekaligus, dikelompokkan
