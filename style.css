@@ -498,7 +498,11 @@ table.tabel-anomali {
 table.tabel-anomali th, table.tabel-anomali td {
   border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top;
   background-color: var(--putih);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
+table.tabel-anomali { table-layout: fixed; }
 table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
 table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
   text-align: center; width: 30px; min-width: 30px;
@@ -521,6 +525,12 @@ table.tabel-anomali td.terkunci {
   cursor: default;
 }
 
+table.tabel-anomali th:nth-child(3), table.tabel-anomali td:nth-child(3) {
+  width: 160px; min-width: 140px;
+}
+table.tabel-anomali td.col-hapus, table.tabel-anomali th.col-hapus {
+  width: 34px; min-width: 34px;
+}
 /* Kolom Anomali & Konfirmasi dilebarin -- ini yang paling penting utk
    dibaca/ditulis, jadi kasih porsi lebih lebar drpd kolom lain. */
 table.tabel-anomali th:nth-child(4), table.tabel-anomali td:nth-child(4) {
