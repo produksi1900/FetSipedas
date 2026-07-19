@@ -501,13 +501,10 @@ table.tabel-anomali th, table.tabel-anomali td {
 }
 table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
 table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
-  text-align: center; width: 34px; min-width: 34px;
-}
-table.tabel-anomali td.col-periode, table.tabel-anomali th.col-periode {
-  width: 84px; white-space: nowrap;
+  text-align: center; width: 30px; min-width: 30px;
 }
 table.tabel-anomali td.col-bulan, table.tabel-anomali th.col-bulan {
-  width: 110px; min-width: 100px;
+  width: 92px; min-width: 84px; white-space: nowrap;
 }
 table.tabel-anomali tr:nth-child(even) td { background-color: #f8f8f8; }
 
@@ -517,8 +514,23 @@ table.tabel-anomali td[contenteditable="true"] {
 table.tabel-anomali td[contenteditable="true"]:focus {
   outline: 2px solid var(--hijau-muda); outline-offset: -2px; background: #eafaf1;
 }
+/* Kolom yang bukan haknya diisi (read-only) sekarang tampil BIASA,
+   putih polos kayak sel lain -- cuma cursor default supaya kelihatan
+   ini bukan area yang bisa diklik-edit. */
 table.tabel-anomali td.terkunci {
-  background-color: var(--abu2) !important; color: #999; font-style: italic;
+  cursor: default;
+}
+
+/* Kolom Anomali & Konfirmasi dilebarin -- ini yang paling penting utk
+   dibaca/ditulis, jadi kasih porsi lebih lebar drpd kolom lain. */
+table.tabel-anomali th:nth-child(4), table.tabel-anomali td:nth-child(4) {
+  min-width: 260px; width: 32%;
+}
+table.tabel-anomali th:nth-child(5), table.tabel-anomali td:nth-child(5) {
+  min-width: 220px; width: 28%;
+}
+table.tabel-anomali th:nth-child(6), table.tabel-anomali td:nth-child(6) {
+  width: 120px; min-width: 110px;
 }
 table.tabel-anomali select.sel-approval {
   width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;

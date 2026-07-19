@@ -300,6 +300,7 @@ function gantiView(view) {
   $("btn-view-rekon").classList.toggle("aktif", view === "rekon");
   $("btn-view-anomali").classList.toggle("aktif", view === "anomali");
   $("btn-view-rangkuman").classList.toggle("aktif", view === "rangkuman");
+  $("toggle-aksi-rekon").classList.toggle("hidden", view !== "rekon");
   if (view === "rangkuman" && state.profile) muatRangkuman();
   if (view === "anomali" && state.profile) muatAnomali();
 }
@@ -1797,9 +1798,19 @@ function buatTdKomoditi(rowId, nilaiSaatIni, editable) {
   return td;
 }
 
+// Label kabupaten yang sedang aktif di panel Anomali -- dipakai buat
+// judul kolom "Konfirmasi <Nama Kab>" biar otomatis ganti sesuai
+// kabupaten yang dipilih (atau kab_id sendiri kalau role kabkot).
+function labelKabAnomaliAktif() {
+  const kabId = $("sel-kab-anomali").value;
+  const entry = DAFTAR_KAB_BABEL.find((d) => d.id === kabId);
+  return entry ? entry.nama : (kabId || "Kabkot");
+}
+
 function renderAnomali(rows) {
   const area = $("anomali-area");
   const prov = isProv();
+  const labelKab = labelKabAnomaliAktif();
 
   if (rows.length === 0 && !prov) {
     area.innerHTML = `<div class="placeholder-kosong">Belum ada anomali yang ditandai Provinsi untuk kombinasi ini.</div>`;
@@ -1811,13 +1822,11 @@ function renderAnomali(rows) {
   tbl.innerHTML = `
     <thead><tr>
       <th class="col-no">No</th>
-      <th class="col-periode">Periode</th>
       <th class="col-bulan">Bulan</th>
       <th>Nama Komoditi</th>
-      <th>Kalimat Anomali</th>
-      <th>Konfirmasi Kabkot</th>
+      <th>Anomali</th>
+      <th>Konfirmasi ${labelKab}</th>
       <th>Approval Provinsi</th>
-      <th>Konfirmasi Ulang</th>
       ${prov ? `<th class="col-hapus"></th>` : ``}
     </tr></thead>`;
   const tbody = document.createElement("tbody");
@@ -1829,24 +1838,10 @@ function renderAnomali(rows) {
     const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
     tdNo.classList.add("col-no");
 
-    const tdPeriode = editableTd(r.periode_teks ?? "", "periode_teks", prov, false);
-    tdPeriode.classList.add("col-periode");
-    // Kalau periode berubah, perlu update dropdown bulan juga
-    if (prov) {
-      tdPeriode.addEventListener("blur", () => {
-        // Update dropdown bulan di baris yang sama
-        const tdBulanEl = tr.querySelector(".td-bulan");
-        if (tdBulanEl) {
-          const newTd = buatTdBulan(r.id, tdPeriode.textContent.trim(), prov);
-          newTd.classList.add("td-bulan");
-          tdBulanEl.replaceWith(newTd);
-        }
-      });
-    }
-
+    // Bulan tetap ditentukan dari periode_teks yang tersimpan (TW-nya),
+    // cuma kolom "Periode" sendiri sudah tidak ditampilkan lagi.
     const tdBulan = buatTdBulan(r.id, r.periode_teks, prov);
-    tdBulan.classList.add("td-bulan");
-    // Set nilai yang sudah tersimpan kalau ada
+    tdBulan.classList.add("td-bulan", "col-bulan");
     if (prov && r.bulan) {
       const sel = tdBulan.querySelector("select");
       if (sel) sel.value = String(r.bulan);
@@ -1874,17 +1869,12 @@ function renderAnomali(rows) {
       tdApproval.classList.add("terkunci");
     }
 
-    const bolehIsiUlang = !prov && r.approval_provinsi === "tidak";
-    const tdUlang = editableTd(r.konfirmasi_ulang ?? "", "konfirmasi_ulang", bolehIsiUlang, false);
-
     tr.appendChild(tdNo);
-    tr.appendChild(tdPeriode);
     tr.appendChild(tdBulan);
     tr.appendChild(tdKomoditi);
     tr.appendChild(tdKalimat);
     tr.appendChild(tdKabkot);
     tr.appendChild(tdApproval);
-    tr.appendChild(tdUlang);
 
     if (prov) {
       const tdHapus = document.createElement("td");
