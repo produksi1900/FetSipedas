@@ -2129,6 +2129,13 @@ async function simpanKolomAnomali(id, field, value) {
   try {
     const { error } = await supabase.from("konfirmasi_anomali").update({ [field]: value }).eq("id", id);
     if (error) throw error;
+    // PENTING: cache lokal (state.anomaliRows) dipakai ulang oleh sort
+    // (renderAnomaliSorted) TANPA fetch ulang ke DB -- kalau cache ini
+    // tidak disinkronkan tiap kali ada edit, klik sort akan me-render
+    // ulang dari data LAMA dan bikin isian yang baru diketik/dipilih
+    // kelihatan "hilang" (balik ke nilai sebelum diedit).
+    const row = state.anomaliRows.find((r) => r.id === id);
+    if (row) row[field] = value;
   } catch (e) {
     alert("Gagal menyimpan: " + e.message);
   }
