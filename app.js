@@ -1734,10 +1734,14 @@ async function muatAnomali() {
 }
 
 // Buat td dropdown Bulan -- SEKARANG bebas pilih semua 12 bulan (tidak
-// dibatasi ke TW tertentu lagi), dikasih nomor di depan label supaya
-// bisa "diketik cepat" (native <select> browser mendukung typeahead:
-// ngetik "1" lalu "2" cepat akan lompat ke opsi "12 - Desember").
-function buatTdBulan(rowId, periodeTeks, editable) {
+// dibatasi ke TW tertentu lagi), dan sekarang jadi combobox ketik+cari
+// (bukan <select> native) -- alasan sama kayak Komoditi: <select> browser
+// suka kebuka ke ATAS kalau space-nya dianggap kurang, dan gak bisa
+// diketik cari. Nama bulan disingkat (Jan, Feb, dst) biar muat & gampang
+// diketik cari ("jan" langsung ketemu).
+const BULAN_SINGKAT_ANOMALI = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+function buatTdBulan(rowId, bulanSaatIni, editable) {
   const td = document.createElement("td");
 
   if (!editable) {
@@ -1746,20 +1750,87 @@ function buatTdBulan(rowId, periodeTeks, editable) {
     return td;
   }
 
-  const sel = document.createElement("select");
-  sel.className = "sel-bulan-anomali";
-  sel.style.cssText = "width:100%;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;";
-  sel.innerHTML = `<option value="">— Pilih —</option>` +
-    NAMA_BULAN.slice(1).map((nama, idx) => {
-      const b = idx + 1;
-      return `<option value="${b}">${String(b).padStart(2, "0")} - ${nama}</option>`;
-    }).join("");
+  const labelSaatIni = bulanSaatIni ? BULAN_SINGKAT_ANOMALI[bulanSaatIni - 1] : "";
 
-  sel.addEventListener("change", async () => {
-    await simpanKolomAnomali(rowId, "bulan", sel.value ? Number(sel.value) : null);
+  const wrap = document.createElement("div");
+  wrap.className = "combo-wrap";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "combo-input";
+  input.autocomplete = "off";
+  input.placeholder = "Cari bulan...";
+  input.value = labelSaatIni;
+
+  const list = document.createElement("div");
+  list.className = "combo-list hidden";
+
+  let labelTersimpan = labelSaatIni;
+
+  function renderList(filterTeks) {
+    const q = normalisasiNamaTanaman(filterTeks || "");
+    const hasil = q
+      ? BULAN_SINGKAT_ANOMALI.filter((n) => normalisasiNamaTanaman(n).includes(q))
+      : BULAN_SINGKAT_ANOMALI;
+    list.innerHTML = hasil.length
+      ? hasil.map((n) => `<div class="combo-option" data-nama="${n}">${n}</div>`).join("")
+      : `<div class="combo-empty">(tidak ada yang cocok)</div>`;
+    list.classList.remove("hidden");
+  }
+
+  async function pilihBulan(labelBulan) {
+    input.value = labelBulan;
+    labelTersimpan = labelBulan;
+    list.classList.add("hidden");
+    const nomor = BULAN_SINGKAT_ANOMALI.indexOf(labelBulan) + 1;
+    await simpanKolomAnomali(rowId, "bulan", nomor || null);
+  }
+
+  input.addEventListener("focus", () => renderList(input.value));
+  input.addEventListener("input", () => renderList(input.value));
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const opsiPertama = list.querySelector(".combo-option");
+      if (opsiPertama) {
+        pilihBulan(opsiPertama.dataset.nama);
+      } else {
+        input.value = labelTersimpan;
+        list.classList.add("hidden");
+      }
+      input.blur();
+    } else if (e.key === "Escape") {
+      input.value = labelTersimpan;
+      list.classList.add("hidden");
+      input.blur();
+    }
   });
 
-  td.appendChild(sel);
+  list.addEventListener("mousedown", (e) => {
+    const opt = e.target.closest(".combo-option");
+    if (!opt) return;
+    e.preventDefault();
+    pilihBulan(opt.dataset.nama);
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      list.classList.add("hidden");
+      const ketikan = input.value.trim();
+      if (ketikan === labelTersimpan) return;
+      const cocok = BULAN_SINGKAT_ANOMALI.find((n) => normalisasiNamaTanaman(n) === normalisasiNamaTanaman(ketikan));
+      if (cocok) {
+        pilihBulan(cocok);
+      } else {
+        input.value = labelTersimpan; // gak cocok -> batal, balik ke nilai lama
+      }
+    }, 150);
+  });
+
+  wrap.appendChild(input);
+  wrap.appendChild(list);
+  td.appendChild(wrap);
   return td;
 }
 
@@ -1925,14 +1996,8 @@ function renderAnomali(rows) {
     const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
     tdNo.classList.add("col-no");
 
-    // Bulan tetap ditentukan dari periode_teks yang tersimpan (TW-nya),
-    // cuma kolom "Periode" sendiri sudah tidak ditampilkan lagi.
-    const tdBulan = buatTdBulan(r.id, r.periode_teks, prov);
+    const tdBulan = buatTdBulan(r.id, r.bulan, prov);
     tdBulan.classList.add("td-bulan", "col-bulan");
-    if (prov && r.bulan) {
-      const sel = tdBulan.querySelector("select");
-      if (sel) sel.value = String(r.bulan);
-    }
 
     const tdKomoditi = buatTdKomoditi(r.id, r.nama_komoditi ?? "", prov);
     const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
@@ -2006,11 +2071,31 @@ async function simpanKolomAnomali(id, field, value) {
 }
 
 async function hapusBarisAnomali(id, trEl) {
-  if (!confirm("Hapus baris ini?")) return;
   try {
+    const jenis = $("sel-jenis-anomali").value;
+    const kabId = $("sel-kab-anomali").value;
+
     const { error } = await supabase.from("konfirmasi_anomali").delete().eq("id", id);
     if (error) throw error;
-    trEl.remove();
+
+    // Renomori ulang No baris yang tersisa biar urut rapi (1,2,3,...),
+    // gak ada yang "bolong" bekas baris yang dihapus.
+    const sisa = await fetchAllRows((from, to) =>
+      supabase
+        .from("konfirmasi_anomali")
+        .select("id, no_urut")
+        .eq("jenis", jenis).eq("kab_id", kabId)
+        .order("no_urut", { ascending: true })
+        .range(from, to)
+    );
+    for (let i = 0; i < sisa.length; i++) {
+      const nomorBaru = i + 1;
+      if (sisa[i].no_urut !== nomorBaru) {
+        await supabase.from("konfirmasi_anomali").update({ no_urut: nomorBaru }).eq("id", sisa[i].id);
+      }
+    }
+
+    await muatAnomali();
   } catch (e) {
     alert("Gagal menghapus: " + e.message);
   }
