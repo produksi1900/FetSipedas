@@ -77,32 +77,30 @@ body { display: flex; flex-direction: column; }
 }
 .info-bar strong { color: var(--hijau-tua); }
 
-/* ---------- Section 1: Login docked ---------- */
-.section-label-row {
-  display: flex; align-items: center; gap: 8px;
-  margin: 0 0 8px;
+/* ---------- Layar Login (di tengah, sebelum masuk app) ---------- */
+.login-screen {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
 }
-.section-label-row .section-label { margin: 0; }
-.lampu-koneksi {
-  width: 11px; height: 11px; border-radius: 50%;
-  background: #b0b0b0; border: 1px solid #888888;
-  display: inline-block; flex-shrink: 0;
-  transition: background .2s, border-color .2s;
+.login-box {
+  width: 100%; max-width: 340px;
+  background: var(--putih);
+  border: 1px solid #ddd; border-radius: 10px;
+  padding: 28px 26px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  text-align: center;
 }
-.lampu-koneksi.aktif {
-  background: var(--hijau-muda); border-color: var(--hijau-tua);
-}
-.status-koneksi { font-size: 12px; font-style: italic; color: #888; }
-.status-koneksi.error { color: var(--merah); }
-
-#blok-login .field { margin-bottom: 8px; }
-#blok-login label { display: block; font-size: 13px; margin-bottom: 3px; color: #444; }
-#blok-login input[type=text], #blok-login input[type=password] {
-  width: 100%; padding: 7px 9px; font-size: 14px;
+.login-logo { width: 56px; height: 56px; object-fit: contain; margin-bottom: 8px; }
+.login-title { font-weight: bold; font-size: 20px; color: var(--hijau-tua); }
+.login-subtitle { font-size: 12px; color: #888; margin-bottom: 18px; }
+.login-box .field { text-align: left; margin-bottom: 10px; }
+.login-box input[type=text], .login-box input[type=password] {
+  width: 100%; padding: 9px 10px; font-size: 14px;
   border: 1px solid #ccc; border-radius: 5px;
 }
-#blok-login input:focus { outline: none; border-color: var(--hijau-muda); }
-.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0 8px; color: #666; }
+.login-box input:focus { outline: none; border-color: var(--hijau-muda); }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0 12px; color: #666; }
 button.btn-login {
   width: 100%; padding: 9px; border: none; border-radius: 6px;
   background: var(--hijau-muda); color: var(--putih); font-weight: bold; font-size: 14px;
@@ -112,58 +110,36 @@ button.btn-login:hover { background: var(--hijau-tua); }
 button.btn-login:disabled { background: var(--abu-disabled); color: #888; cursor: not-allowed; }
 .pesan-error { color: var(--merah); font-size: 13px; margin-top: 6px; min-height: 14px; }
 
-.info-connected {
-  background: #eafaf1; border: 1px solid var(--hijau-muda); border-radius: 6px;
-  padding: 9px; font-size: 14px; color: var(--hijau-tua); line-height: 1.5;
+/* ---------- Toolbar atas panel Rekonsiliasi (download raw + referensi) ---------- */
+.toolbar-atas {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  background: var(--abu2); border-radius: 6px; padding: 10px 12px;
+  margin-bottom: 4px;
 }
-
-.divider { height: 1px; background: #dddddd; margin: 12px 0; }
-
-/* ---------- Blok terkunci (sebelum login) ---------- */
-/* Kunci pakai opacity+pointer-events pada .isi-terkunci (BUKAN overlay
-   transparan) supaya konten di baliknya benar2 tidak kelihatan/nge-bleed,
-   overlay pesan gembok tampil solid & rapi di tengah. */
-.blok-terkunci { position: relative; }
-.blok-terkunci .isi-terkunci {
-  opacity: 0; pointer-events: none; transition: opacity .2s;
+.toolbar-atas .field { margin-bottom: 0; }
+.toolbar-atas select { padding: 7px 8px; font-size: 13px; }
+.toolbar-atas button.btn-kecil { width: auto; white-space: nowrap; padding: 8px 12px; font-size: 13px; }
+.toolbar-status {
+  font-size: 12px; color: #666; min-height: 0; margin: 4px 0 8px;
 }
-.blok-terkunci.terbuka .isi-terkunci {
-  opacity: 1; pointer-events: auto;
-}
-.overlay-terkunci {
-  position: absolute; inset: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: center;
-  text-align: center; font-size: 14px; color: #999; font-style: italic;
-  padding: 20px;
-}
-.blok-terkunci.terbuka .overlay-terkunci { display: none; }
+.toolbar-status:empty { display: none; }
 
-#panel-download.blok-terkunci { min-height: 90px; }
-#panel-rekon.blok-terkunci .overlay-terkunci { font-size: 15px; }
-
-/* ---------- Layout utama: full-height, cuma panel-kanan yang discroll ---------- */
+/* ---------- Layout utama: full-height, panel kanan full width ---------- */
 .app-shell { display: flex; flex: 1; min-height: 0; }
-.panel-kiri {
-  width: 320px; flex-shrink: 0; background: var(--abu);
-  border-right: 1px solid #ddd; padding: 14px;
-  overflow-y: auto;
-}
 .panel-kanan {
-  flex: 1; padding: 14px;
+  flex: 1; padding: 14px 20px;
   min-height: 0;
-  /* Panel kanan sendiri TIDAK discroll -- yang discroll adalah area
+  /* Panel sendiri TIDAK discroll -- yang discroll adalah area
      tabel di dalamnya (#rekon-area / #rangkuman-area), supaya slicer
      (dropdown Jenis SPH/Tahun/Kab/Komoditi) & tab bar tetap "freeze"
      kelihatan pas scroll ke bawah lihat tabel yang panjang. */
   overflow: hidden;
   display: flex; flex-direction: column;
 }
-/* isi-terkunci di panel-rekon perlu ikut jadi flex column & mengisi
-   sisa tinggi, supaya view-rekon/view-rangkuman di dalamnya bisa
-   menghitung area scroll dgn benar. Panel lain (panel-download,
-   panel-referensi) TIDAK terpengaruh krn selector di-scope ke
-   #panel-rekon saja. */
-#panel-rekon.blok-terkunci .isi-terkunci {
+/* isi panel-rekon perlu jadi flex column & mengisi sisa tinggi, supaya
+   view-rekon/view-rangkuman di dalamnya bisa menghitung area scroll dgn
+   benar. */
+#panel-rekon {
   display: flex; flex-direction: column;
   flex: 1; min-height: 0;
 }
@@ -437,11 +413,10 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
   html, body { overflow: auto; }
   body { display: block; }
   .app-shell { flex-direction: column; }
-  .panel-kiri { width: 100%; border-right: none; border-bottom: 1px solid #ddd; overflow-y: visible; }
   /* Di mobile balik ke scroll biasa 1 halaman -- freeze slicer/tab-bar
      cuma dipakai di layout desktop yang punya tinggi viewport tetap. */
   .panel-kanan { overflow: visible; padding: 10px; display: block; }
-  #panel-rekon.blok-terkunci .isi-terkunci { display: block; flex: none; }
+  #panel-rekon { display: block; flex: none; }
   #view-rekon:not(.hidden), #view-rangkuman:not(.hidden) { display: block; flex: none; }
   #rekon-area, #rangkuman-area { overflow-y: visible; flex: none; padding-right: 0; }
 
@@ -455,7 +430,7 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
 
   .info-bar { font-size: 12px; padding: 6px 12px; }
 
-  .panel-kiri { padding: 12px; }
+  .toolbar-atas { flex-direction: column; align-items: stretch; }
 
   .rekon-slicer { flex-direction: column; align-items: stretch; gap: 8px; }
   .rekon-slicer .field { min-width: 0; }
@@ -493,9 +468,14 @@ table.tabel-anomali th, table.tabel-anomali td {
   background-color: var(--putih);
 }
 table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
-table.tabel-anomali td.col-no { text-align: center; width: 42px; }
+table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
+  text-align: center; width: 34px; min-width: 34px;
+}
 table.tabel-anomali td.col-periode, table.tabel-anomali th.col-periode {
-  width: 90px; white-space: nowrap;
+  width: 84px; white-space: nowrap;
+}
+table.tabel-anomali td.col-bulan, table.tabel-anomali th.col-bulan {
+  width: 110px; min-width: 100px;
 }
 table.tabel-anomali tr:nth-child(even) td { background-color: #f8f8f8; }
 

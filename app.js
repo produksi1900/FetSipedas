@@ -125,24 +125,17 @@ function isNamaGroup(nama) {
 }
 
 // ============================================================
-// AUTH — login didok di panel kiri (bukan fullscreen)
+// AUTH — layar login penuh sebelum masuk, app-shell tampil setelahnya
 // ============================================================
-function setLampuKoneksi(aktif) {
-  $("lampu-koneksi").classList.toggle("aktif", aktif);
-}
-
-function bukaKunci(aktif) {
-  // Buka/kunci Section 2 (download) & Section 3 (rekon+rangkuman)
-  $("panel-download").classList.toggle("terbuka", aktif);
-  $("panel-rekon").classList.toggle("terbuka", aktif);
+function tampilkanApp(masuk) {
+  $("login-screen").classList.toggle("hidden", masuk);
+  $("app-shell").classList.toggle("hidden", !masuk);
 }
 
 async function cekSesiAwal() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
     await masukKeApp();
-  } else {
-    setLampuKoneksi(false);
   }
 }
 
@@ -159,7 +152,6 @@ async function masukKeApp() {
   if (error || !profile) {
     $("login-error").textContent = "Akun ditemukan tapi profil belum terdaftar. Hubungi admin.";
     await supabase.auth.signOut();
-    setLampuKoneksi(false);
     return;
   }
 
@@ -169,20 +161,12 @@ async function masukKeApp() {
   const labelUser = `${profile.nama_tampil} (${profile.role === "prov" ? "Provinsi" : "Kab/Kota"})`;
   $("lbl-user").textContent = labelUser;
   $("lbl-user").classList.remove("hidden");
-  $("lbl-user-inline").textContent = labelUser;
   $("btn-logout").classList.remove("hidden");
   $("info-terakhir").classList.remove("hidden");
 
-  // ---- Update UI: Section 1 ----
-  $("blok-login").classList.add("hidden");
-  $("blok-connected").classList.remove("hidden");
-  $("status-koneksi").textContent = "";
-  setLampuKoneksi(true);
+  tampilkanApp(true);
 
-  // ---- Buka kunci Section 2 & 3 ----
-  bukaKunci(true);
-
-  // ---- Section 2: Download Data ----
+  // ---- Toolbar Download Raw Data ----
   // Sama untuk semua role, cuma beda kuncian Kabupaten:
   // - prov  : boleh pilih kabupaten manapun / "Semua Kabupaten/Kota"
   // - kabkot: terkunci ke kabupatennya sendiri (RLS di Supabase juga
@@ -199,19 +183,10 @@ async function masukKeApp() {
   $("btn-download").disabled = false;
   $("btn-download-rangkuman").disabled = false;
 
-  // Catatan "bisa dipakai di aplikasi desktop" cuma relevan utk role prov.
-  $("catatan-download-desktop").classList.toggle("hidden", profile.role !== "prov");
-
   isiPilihanTahun($("sel-tahun-rekon"));
 
-  // ---- Section 3: Referensi ID Tanaman (khusus prov) ----
-  $("panel-referensi").classList.toggle("hidden", profile.role !== "prov");
-
-  // ---- Penomoran section Rekonsiliasi: geser jadi "3." utk kabkot
-  // karena mereka tidak punya section 3 (Referensi ID Tanaman) ----
-  $("label-rekon").textContent = profile.role === "prov"
-    ? "4. Rekonsiliasi & Rangkuman Data"
-    : "3. Rekonsiliasi & Rangkuman Data";
+  // ---- Upload Referensi ID Tanaman (khusus prov), ditaruh di toolbar atas ----
+  $("wrap-referensi").classList.toggle("hidden", profile.role !== "prov");
 
   // ---- Panel Rangkuman: siapkan pilihan tahun & kabupaten ----
   isiPilihanTahun($("sel-tahun-rangkuman"));
@@ -240,6 +215,8 @@ async function masukKeApp() {
   await muatUlangJenis();
   await muatData(); // render otomatis begitu selesai login, tanpa perlu klik ulang dropdown
 
+  mulaiRotasiInfo();
+
   // Kalau lagi buka view Rangkuman (mis. sisa state sebelumnya), muat juga
   if (!$("view-rangkuman").classList.contains("hidden")) {
     await muatRangkuman();
@@ -251,22 +228,22 @@ function keluarDariApp() {
   $("lbl-user").classList.add("hidden");
   $("btn-logout").classList.add("hidden");
   $("info-terakhir").classList.add("hidden");
+  berhentiRotasiInfo();
 
-  $("blok-login").classList.remove("hidden");
-  $("blok-connected").classList.add("hidden");
-  setLampuKoneksi(false);
-  bukaKunci(false);
+  tampilkanApp(false);
 
   $("btn-download").disabled = true;
   $("btn-download-rangkuman").disabled = true;
   $("log-download-rangkuman").textContent = "";
   $("wrap-kab-download").classList.add("hidden");
-  $("panel-referensi").classList.add("hidden");
+  $("wrap-referensi").classList.add("hidden");
   $("in-file-referensi").value = "";
-  $("log-referensi").textContent = "Belum ada file dipilih.";
+  $("log-referensi").textContent = "";
+  $("log-download").textContent = "";
 
   $("in-username").value = "";
   $("in-password").value = "";
+  $("login-error").textContent = "";
 
   // Reset panel kanan balik ke view Rekonsiliasi
   gantiView("rekon");
@@ -285,7 +262,6 @@ async function login() {
   const username = $("in-username").value.trim().toLowerCase();
   const password = $("in-password").value;
   $("login-error").textContent = "";
-  $("status-koneksi").textContent = "";
 
   if (!username || !password) {
     $("login-error").textContent = "Username & password wajib diisi.";
@@ -294,7 +270,6 @@ async function login() {
 
   $("btn-login").disabled = true;
   $("btn-login").textContent = "Menyambungkan...";
-  $("status-koneksi").textContent = "menyambungkan...";
 
   const email = username + EMAIL_DOMAIN;
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -304,8 +279,6 @@ async function login() {
 
   if (error) {
     $("login-error").textContent = "Username atau password salah.";
-    $("status-koneksi").textContent = "";
-    setLampuKoneksi(false);
     return;
   }
   await masukKeApp();
@@ -318,20 +291,21 @@ $("btn-logout").addEventListener("click", async () => {
 
 // ============================================================
 // TOGGLE PANEL KANAN: Rekonsiliasi <-> Rangkuman
+
 // ============================================================
 function gantiView(view) {
   $("view-rekon").classList.toggle("hidden", view !== "rekon");
   $("view-rangkuman").classList.toggle("hidden", view !== "rangkuman");
   $("view-anomali").classList.toggle("hidden", view !== "anomali");
   $("btn-view-rekon").classList.toggle("aktif", view === "rekon");
-  $("btn-view-rangkuman").classList.toggle("aktif", view === "rangkuman");
   $("btn-view-anomali").classList.toggle("aktif", view === "anomali");
+  $("btn-view-rangkuman").classList.toggle("aktif", view === "rangkuman");
   if (view === "rangkuman" && state.profile) muatRangkuman();
   if (view === "anomali" && state.profile) muatAnomali();
 }
 $("btn-view-rekon").addEventListener("click", () => gantiView("rekon"));
-$("btn-view-rangkuman").addEventListener("click", () => gantiView("rangkuman"));
 $("btn-view-anomali").addEventListener("click", () => gantiView("anomali"));
+$("btn-view-rangkuman").addEventListener("click", () => gantiView("rangkuman"));
 
 // ============================================================
 // PANEL KIRI: DOWNLOAD DATA (baca dari database, export ke Excel)
@@ -507,8 +481,6 @@ async function downloadData() {
       `✓ Selesai! ${totalRows} baris diexport ke "${namaFile}".\n` +
       `${ringkasan.join("\n")}` +
       catatanDesktop;
-
-    await muatInfoTerakhir();
   } catch (e) {
     logBox.textContent = `✗ Gagal mengambil/export data: ${e.message}`;
   } finally {
@@ -517,10 +489,14 @@ async function downloadData() {
   }
 }
 
-async function muatInfoTerakhir() {
-  const jenis = $("sel-jenis").value;
-  const tahun = Number($("sel-tahun-rekon").value);
+// Info "terakhir diperbarui" TIDAK lagi bergantung dropdown yang dipilih --
+// ditampilkan bergilir otomatis tiap 5 detik utk semua jenis SPH (tahun
+// berjalan sekarang).
+const JENIS_ROTASI_INFO = ["sbs", "tbf", "th", "bst"];
+let infoRotasiIdx = 0;
+let infoRotasiTimer = null;
 
+async function muatInfoTerakhirUntuk(jenis, tahun) {
   const { data } = await supabase
     .from("sync_meta")
     .select("tahun, last_synced_at, status")
@@ -544,11 +520,28 @@ async function muatInfoTerakhir() {
     `Data <strong>${jenis.toUpperCase()}</strong> (tahun ${data.tahun}) terakhir diperbarui: <strong>${teks} WIB</strong> — status: ${data.status}`;
 }
 
+async function tampilkanInfoRotasiBerikutnya() {
+  const jenis = JENIS_ROTASI_INFO[infoRotasiIdx % JENIS_ROTASI_INFO.length];
+  infoRotasiIdx++;
+  await muatInfoTerakhirUntuk(jenis, TAHUN_SEKARANG);
+}
+
+function mulaiRotasiInfo() {
+  berhentiRotasiInfo();
+  infoRotasiIdx = 0;
+  tampilkanInfoRotasiBerikutnya();
+  infoRotasiTimer = setInterval(tampilkanInfoRotasiBerikutnya, 5000);
+}
+
+function berhentiRotasiInfo() {
+  if (infoRotasiTimer) { clearInterval(infoRotasiTimer); infoRotasiTimer = null; }
+}
+
 // ============================================================
 // PANEL KANAN — VIEW: REKON
 // ============================================================
 $("sel-jenis").addEventListener("change", muatUlangJenis);
-$("sel-tahun-rekon").addEventListener("change", async () => { await muatInfoTerakhir(); await siapkanKabSelect(); await muatData(); });
+$("sel-tahun-rekon").addEventListener("change", async () => { await siapkanKabSelect(); await muatData(); });
 $("sel-kab").addEventListener("change", async () => { await siapkanKomoditiSelect(); await muatData(); });
 $("sel-komoditi").addEventListener("change", muatData);
 
@@ -556,7 +549,6 @@ async function muatUlangJenis() {
   if (!state.profile) return;
   siapkanTabBar();
   await siapkanKabSelect();
-  await muatInfoTerakhir();
   await muatData();
 }
 
@@ -664,31 +656,36 @@ async function muatReferensiIdTanaman() {
     data = [];
   }
   const map = { sbs: {}, bst: {}, tbf: {}, th: {} };
+  const namaAsli = { sbs: [], bst: [], tbf: [], th: {} };
+
+  // Kumpulkan per jenis, urut by urutan
+  const perJenis = { sbs: [], bst: [], tbf: [], th: [] };
   if (data) {
     for (const row of data) {
       if (!map[row.jenis]) map[row.jenis] = {};
       map[row.jenis][normalisasiNamaTanaman(row.namatanaman)] = row.urutan;
+      if (perJenis[row.jenis]) perJenis[row.jenis].push({ nama: row.namatanaman, urutan: row.urutan });
     }
   }
+  // Urutkan nama asli sesuai urutan referensi
+  for (const jenis of ["sbs", "bst", "tbf", "th"]) {
+    perJenis[jenis].sort((a, b) => a.urutan - b.urutan);
+    namaAsli[jenis] = perJenis[jenis].map((r) => r.nama);
+  }
+
   state.idTanamanUrutan = map;
+  state.idTanamanNamaAsli = namaAsli;
 }
 
-const btnUploadReferensi = $("btn-upload-referensi");
-if (btnUploadReferensi) btnUploadReferensi.addEventListener("click", uploadReferensiIdTanaman);
+$("in-file-referensi")?.addEventListener("change", uploadReferensiIdTanaman);
 
 async function uploadReferensiIdTanaman() {
   const fileInput = $("in-file-referensi");
   const logBox = $("log-referensi");
-  const btn = $("btn-upload-referensi");
   const file = fileInput.files[0];
 
-  if (!file) {
-    logBox.textContent = "Pilih file Excel referensi dulu.";
-    return;
-  }
+  if (!file) return;
 
-  btn.disabled = true;
-  btn.textContent = "⏳ Memproses...";
   logBox.textContent = "Membaca file...";
 
   const jenisValid = ["sbs", "bst", "tbf", "th"];
@@ -745,8 +742,7 @@ async function uploadReferensiIdTanaman() {
   } catch (e) {
     logBox.textContent = `✗ Gagal: ${e.message}`;
   } finally {
-    btn.disabled = false;
-    btn.textContent = "⬆ Upload Referensi";
+    fileInput.value = "";
   }
 }
 
@@ -1646,6 +1642,39 @@ $("sel-kab-anomali").addEventListener("change", muatAnomali);
 
 function isProv() { return state.profile?.role === "prov"; }
 
+// Hitung TW saat ini berdasarkan bulan sekarang
+function twSekarang() {
+  return Math.ceil((new Date().getMonth() + 1) / 3);
+}
+
+// Daftar bulan dalam satu TW (1-indexed)
+function bulanDalamTw(tw) {
+  const start = (tw - 1) * 3 + 1;
+  return [start, start + 1, start + 2];
+}
+
+const NAMA_BULAN = [
+  "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+];
+
+// Buat label default periode: "TW2 2026"
+function labelPeriodeDefault() {
+  return `TW${twSekarang()} ${new Date().getFullYear()}`;
+}
+
+// Ambil daftar komoditi dari state.idTanamanUrutan untuk jenis yg sedang dipilih
+function daftarKomoditiAnomali() {
+  const jenis = $("sel-jenis-anomali").value;
+  const urutanMap = state.idTanamanUrutan[jenis] || {};
+  const entries = Object.entries(urutanMap); // [namaLower, urutan]
+  // Kembalikan nama asli (Title Case) dari referensi — kita simpan juga nama asli
+  // Karena idTanamanUrutan menyimpan nama lowercase sebagai key, kita butuh nama asli
+  // Ambil dari state.idTanamanNamaAsli yang akan kita isi saat muatReferensiIdTanaman
+  const namaAsli = state.idTanamanNamaAsli?.[jenis] || [];
+  return namaAsli;
+}
+
 function siapkanSlicerAnomali() {
   const selKab = $("sel-kab-anomali");
   if (isProv()) {
@@ -1690,6 +1719,71 @@ async function muatAnomali() {
   renderAnomali(rows || []);
 }
 
+// Buat td dropdown bulan berdasarkan periode_teks (mis. "TW2 2026")
+function buatTdBulan(rowId, periodeTeks, editable) {
+  const td = document.createElement("td");
+
+  // Parse TW dari periode_teks
+  const matchTw = String(periodeTeks || "").match(/TW\s*(\d)/i);
+  const tw = matchTw ? Number(matchTw[1]) : twSekarang();
+  const bulanOptions = bulanDalamTw(tw);
+
+  if (!editable) {
+    td.classList.add("terkunci");
+    td.textContent = ""; // kabkot tidak perlu lihat ini di sini
+    return td;
+  }
+
+  const sel = document.createElement("select");
+  sel.className = "sel-bulan-anomali";
+  sel.style.cssText = "width:100%;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;";
+  sel.innerHTML = `<option value="">— Pilih —</option>` +
+    bulanOptions.map((b) => `<option value="${b}">${NAMA_BULAN[b]}</option>`).join("");
+
+  sel.addEventListener("change", async () => {
+    await simpanKolomAnomali(rowId, "bulan", sel.value ? Number(sel.value) : null);
+  });
+
+  td.appendChild(sel);
+  return td;
+}
+
+// Buat td dropdown komoditi dari referensi id_tanaman
+function buatTdKomoditi(rowId, nilaiSaatIni, editable) {
+  const td = document.createElement("td");
+
+  if (!editable) {
+    td.classList.add("terkunci");
+    td.textContent = nilaiSaatIni || "";
+    return td;
+  }
+
+  const namaList = daftarKomoditiAnomali();
+
+  if (namaList.length === 0) {
+    // Fallback: text editable biasa kalau referensi belum diupload
+    td.contentEditable = "true";
+    td.textContent = nilaiSaatIni || "";
+    td.addEventListener("blur", async () => {
+      await simpanKolomAnomali(rowId, "nama_komoditi", td.textContent.trim());
+    });
+    return td;
+  }
+
+  const sel = document.createElement("select");
+  sel.className = "sel-komoditi-anomali";
+  sel.style.cssText = "width:100%;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;";
+  sel.innerHTML = `<option value="">— Pilih —</option>` +
+    namaList.map((n) => `<option value="${n}" ${n === nilaiSaatIni ? "selected" : ""}>${n}</option>`).join("");
+
+  sel.addEventListener("change", async () => {
+    await simpanKolomAnomali(rowId, "nama_komoditi", sel.value);
+  });
+
+  td.appendChild(sel);
+  return td;
+}
+
 function renderAnomali(rows) {
   const area = $("anomali-area");
   const prov = isProv();
@@ -1703,8 +1797,9 @@ function renderAnomali(rows) {
   tbl.className = "tabel-anomali";
   tbl.innerHTML = `
     <thead><tr>
-      <th class="col-periode">Periode</th>
       <th class="col-no">No</th>
+      <th class="col-periode">Periode</th>
+      <th class="col-bulan">Bulan</th>
       <th>Nama Komoditi</th>
       <th>Kalimat Anomali</th>
       <th>Konfirmasi Kabkot</th>
@@ -1718,11 +1813,33 @@ function renderAnomali(rows) {
     const tr = document.createElement("tr");
     tr.dataset.id = r.id;
 
-    const tdPeriode = editableTd(r.periode_teks ?? "", "periode_teks", prov, false);
-    tdPeriode.classList.add("col-periode");
     const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
     tdNo.classList.add("col-no");
-    const tdKomoditi = editableTd(r.nama_komoditi ?? "", "nama_komoditi", prov, false);
+
+    const tdPeriode = editableTd(r.periode_teks ?? "", "periode_teks", prov, false);
+    tdPeriode.classList.add("col-periode");
+    // Kalau periode berubah, perlu update dropdown bulan juga
+    if (prov) {
+      tdPeriode.addEventListener("blur", () => {
+        // Update dropdown bulan di baris yang sama
+        const tdBulanEl = tr.querySelector(".td-bulan");
+        if (tdBulanEl) {
+          const newTd = buatTdBulan(r.id, tdPeriode.textContent.trim(), prov);
+          newTd.classList.add("td-bulan");
+          tdBulanEl.replaceWith(newTd);
+        }
+      });
+    }
+
+    const tdBulan = buatTdBulan(r.id, r.periode_teks, prov);
+    tdBulan.classList.add("td-bulan");
+    // Set nilai yang sudah tersimpan kalau ada
+    if (prov && r.bulan) {
+      const sel = tdBulan.querySelector("select");
+      if (sel) sel.value = String(r.bulan);
+    }
+
+    const tdKomoditi = buatTdKomoditi(r.id, r.nama_komoditi ?? "", prov);
     const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
     const tdKabkot = editableTd(r.konfirmasi_kabkot ?? "", "konfirmasi_kabkot", !prov, false);
 
@@ -1744,12 +1861,12 @@ function renderAnomali(rows) {
       tdApproval.classList.add("terkunci");
     }
 
-    // Konfirmasi Ulang cuma bisa diisi kabkot, DAN cuma kalau approval = "tidak"
     const bolehIsiUlang = !prov && r.approval_provinsi === "tidak";
     const tdUlang = editableTd(r.konfirmasi_ulang ?? "", "konfirmasi_ulang", bolehIsiUlang, false);
 
-    tr.appendChild(tdPeriode);
     tr.appendChild(tdNo);
+    tr.appendChild(tdPeriode);
+    tr.appendChild(tdBulan);
     tr.appendChild(tdKomoditi);
     tr.appendChild(tdKalimat);
     tr.appendChild(tdKabkot);
@@ -1813,12 +1930,13 @@ $("btn-tambah-baris-anomali")?.addEventListener("click", async () => {
   const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
   const rowsSaatIni = $("anomali-area").querySelectorAll("tbody tr").length;
+  const periodeDef = labelPeriodeDefault();
 
   try {
     const { error } = await supabase.from("konfirmasi_anomali").insert({
       jenis, kab_id: kabId,
       no_urut: rowsSaatIni + 1,
-      periode_teks: "",
+      periode_teks: periodeDef,
       nama_komoditi: "", kalimat_anomali: "",
     });
     if (error) throw error;
@@ -1841,13 +1959,18 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rowsSheet = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    const daftar = rowsSheet.map((row, i) => ({
-      jenis, kab_id: kabId,
-      periode_teks: String(row["Periode"] ?? row.periode ?? "").trim(),
-      no_urut: Number(row.No ?? row.no ?? i + 1) || (i + 1),
-      nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
-      kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
-    })).filter((r) => r.nama_komoditi || r.kalimat_anomali);
+    const daftar = rowsSheet.map((row, i) => {
+      const bulanRaw = row["Bulan"] ?? row.bulan ?? "";
+      const bulanVal = bulanRaw !== "" ? (Number(bulanRaw) || null) : null;
+      return {
+        jenis, kab_id: kabId,
+        periode_teks: String(row["Periode"] ?? row.periode ?? "").trim(),
+        no_urut: Number(row.No ?? row.no ?? i + 1) || (i + 1),
+        bulan: bulanVal,
+        nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
+        kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
+      };
+    }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
 
     if (daftar.length === 0) {
       alert("Tidak ada baris valid di file Excel. Pastikan ada kolom 'Periode', 'No', 'Nama Komoditi', 'Kalimat Anomali'.");
@@ -1889,7 +2012,7 @@ async function downloadAnomaliExcel() {
   }
 
   const wb = XLSX.utils.book_new();
-  const headers = ["Periode", "No", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi", "Konfirmasi Ulang"];
+  const headers = ["No", "Periode", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi", "Konfirmasi Ulang"];
   const ws = {};
   const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } };
   const setCell = (r, c, cell) => { ws[XLSX.utils.encode_cell({ r, c })] = cell; };
@@ -1897,8 +2020,9 @@ async function downloadAnomaliExcel() {
   headers.forEach((h, c) => setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" })));
   rows.forEach((r, i) => {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
+    const bulanLabel = r.bulan ? (NAMA_BULAN[r.bulan] || r.bulan) : "";
     const vals = [
-      r.periode_teks, r.no_urut, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.no_urut, r.periode_teks, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
       r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
       r.konfirmasi_ulang,
     ];
@@ -1906,7 +2030,7 @@ async function downloadAnomaliExcel() {
   });
 
   ws["!ref"] = XLSX.utils.encode_range(range);
-  ws["!cols"] = [{ wch: 12 }, { wch: 6 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 30 }];
+  ws["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 30 }];
   XLSX.utils.book_append_sheet(wb, ws, "Anomali");
 
   const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
