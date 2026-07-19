@@ -1871,7 +1871,10 @@ function buatTdBulan(rowId, bulanSaatIni, editable) {
 
   if (!editable) {
     td.classList.add("terkunci");
-    td.textContent = ""; // kabkot tidak perlu lihat ini di sini
+    // Sebelumnya kolom ini sengaja dikosongkan utk role kabkot -- itu
+    // keliru: kabkot tetap perlu MELIHAT bulan anomali (cuma tidak
+    // boleh MENGEDIT-nya, makanya pakai class "terkunci" bukan combo).
+    td.textContent = bulanSaatIni ? (BULAN_SINGKAT_ANOMALI[bulanSaatIni - 1] || "") : "";
     return td;
   }
 
