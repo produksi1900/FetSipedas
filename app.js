@@ -1793,7 +1793,8 @@ function nilaiKolomDariBarisAnomali(tr, kolom) {
     case "bulan": {
       const input = tds[1 + offset]?.querySelector(".combo-input");
       const txt = (input ? input.value : tds[1 + offset]?.textContent || "").trim();
-      const idx = BULAN_SINGKAT_ANOMALI.indexOf(txt);
+      const jenisAktif = $("sel-jenis-anomali").value;
+      const idx = daftarPeriodeAnomali(jenisAktif).indexOf(txt);
       return idx >= 0 ? idx + 1 : null;
     }
     case "nama_komoditi": {
@@ -1853,7 +1854,8 @@ function perbaruiLabelHeaderAnomali() {
   if (!table) return;
   const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
   const labelKab = labelKabAnomaliAktif();
-  const labelKolom = { no_urut: "No", bulan: "Bulan", nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  const jenisAktif = $("sel-jenis-anomali").value;
+  const labelKolom = { no_urut: "No", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
   table.querySelectorAll("thead th.th-sortable").forEach((th) => {
     const key = th.dataset.kolom;
     const panah = kolomAktif === key ? (arahAktif === "asc" ? " ▲" : " ▼") : "";
@@ -1868,20 +1870,35 @@ function perbaruiLabelHeaderAnomali() {
 // diketik cari. Nama bulan disingkat (Jan, Feb, dst) biar muat & gampang
 // diketik cari ("jan" langsung ketemu).
 const BULAN_SINGKAT_ANOMALI = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const TRIWULAN_LABEL_ANOMALI = ["Tw1", "Tw2", "Tw3", "Tw4"];
 
-function buatTdBulan(rowId, bulanSaatIni, editable) {
+// SPH-SBS pakai periode Bulan (1-12), sedangkan SPH-BST/TBF/TH pakai
+// Triwulan (1-4) -- sama seperti tabel data_* masing2 jenis. Kolom di
+// database "konfirmasi_anomali" TETAP bernama "bulan" (tidak perlu
+// migrasi skema), cuma nilainya diinterpretasikan beda tergantung jenis
+// SPH yang sedang aktif: 1-12 utk SBS, 1-4 utk BST/TBF/TH.
+function daftarPeriodeAnomali(jenis) {
+  return jenis === "sbs" ? BULAN_SINGKAT_ANOMALI : TRIWULAN_LABEL_ANOMALI;
+}
+function labelKolomPeriodeAnomali(jenis) {
+  return jenis === "sbs" ? "Bulan" : "Triwulan";
+}
+
+function buatTdBulan(rowId, bulanSaatIni, editable, jenis) {
+  const daftarPeriode = daftarPeriodeAnomali(jenis);
   const td = document.createElement("td");
 
   if (!editable) {
     td.classList.add("terkunci");
     // Sebelumnya kolom ini sengaja dikosongkan utk role kabkot -- itu
-    // keliru: kabkot tetap perlu MELIHAT bulan anomali (cuma tidak
-    // boleh MENGEDIT-nya, makanya pakai class "terkunci" bukan combo).
-    td.textContent = bulanSaatIni ? (BULAN_SINGKAT_ANOMALI[bulanSaatIni - 1] || "") : "";
+    // keliru: kabkot tetap perlu MELIHAT bulan/triwulan anomali (cuma
+    // tidak boleh MENGEDIT-nya, makanya pakai class "terkunci" bukan
+    // combo).
+    td.textContent = bulanSaatIni ? (daftarPeriode[bulanSaatIni - 1] || "") : "";
     return td;
   }
 
-  const labelSaatIni = bulanSaatIni ? BULAN_SINGKAT_ANOMALI[bulanSaatIni - 1] : "";
+  const labelSaatIni = bulanSaatIni ? daftarPeriode[bulanSaatIni - 1] : "";
 
   const wrap = document.createElement("div");
   wrap.className = "combo-wrap";
@@ -1890,7 +1907,7 @@ function buatTdBulan(rowId, bulanSaatIni, editable) {
   input.type = "text";
   input.className = "combo-input";
   input.autocomplete = "off";
-  input.placeholder = "Cari bulan...";
+  input.placeholder = jenis === "sbs" ? "Cari bulan..." : "Cari triwulan...";
   input.value = labelSaatIni;
 
   const list = document.createElement("div");
@@ -1901,8 +1918,8 @@ function buatTdBulan(rowId, bulanSaatIni, editable) {
   function renderList(filterTeks) {
     const q = normalisasiNamaTanaman(filterTeks || "");
     const hasil = q
-      ? BULAN_SINGKAT_ANOMALI.filter((n) => normalisasiNamaTanaman(n).includes(q))
-      : BULAN_SINGKAT_ANOMALI;
+      ? daftarPeriode.filter((n) => normalisasiNamaTanaman(n).includes(q))
+      : daftarPeriode;
     list.innerHTML = hasil.length
       ? hasil.map((n) => `<div class="combo-option" data-nama="${n}">${n}</div>`).join("")
       : `<div class="combo-empty">(tidak ada yang cocok)</div>`;
@@ -1913,7 +1930,7 @@ function buatTdBulan(rowId, bulanSaatIni, editable) {
     input.value = labelBulan;
     labelTersimpan = labelBulan;
     list.classList.add("hidden");
-    const nomor = BULAN_SINGKAT_ANOMALI.indexOf(labelBulan) + 1;
+    const nomor = daftarPeriode.indexOf(labelBulan) + 1;
     await simpanKolomAnomali(rowId, "bulan", nomor || null);
   }
 
@@ -1950,7 +1967,7 @@ function buatTdBulan(rowId, bulanSaatIni, editable) {
       list.classList.add("hidden");
       const ketikan = input.value.trim();
       if (ketikan === labelTersimpan) return;
-      const cocok = BULAN_SINGKAT_ANOMALI.find((n) => normalisasiNamaTanaman(n) === normalisasiNamaTanaman(ketikan));
+      const cocok = daftarPeriode.find((n) => normalisasiNamaTanaman(n) === normalisasiNamaTanaman(ketikan));
       if (cocok) {
         pilihBulan(cocok);
       } else {
@@ -2100,6 +2117,7 @@ function renderAnomali(rows) {
   const area = $("anomali-area");
   const prov = isProv();
   const labelKab = labelKabAnomaliAktif();
+  const jenisAktif = $("sel-jenis-anomali").value;
 
   if (rows.length === 0 && !prov) {
     area.innerHTML = `<div class="placeholder-kosong">Belum ada anomali yang ditandai Provinsi untuk kombinasi ini.</div>`;
@@ -2110,7 +2128,7 @@ function renderAnomali(rows) {
   tbl.className = "tabel-anomali";
 
   const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
-  const labelKolom = { no_urut: "No", bulan: "Bulan", nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  const labelKolom = { no_urut: "No", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
   const clsExtra = {
     no_urut: "col-no",
     bulan: "col-bulan",
@@ -2176,7 +2194,7 @@ function renderAnomali(rows) {
     const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
     tdNo.classList.add("col-no");
 
-    const tdBulan = buatTdBulan(r.id, r.bulan, prov);
+    const tdBulan = buatTdBulan(r.id, r.bulan, prov, jenisAktif);
     tdBulan.classList.add("td-bulan", "col-bulan");
 
     const tdKomoditi = buatTdKomoditi(r.id, r.nama_komoditi ?? "", prov);
@@ -2485,21 +2503,37 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
       if (!jenis) { sheetTakDikenali.push(sheetName); continue; }
 
       const rowsSheet = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: "" });
+      const jenisAdalahBulan = jenis === "sbs";
+      const daftarPeriodeSheet = daftarPeriodeAnomali(jenis);
       const daftar = rowsSheet.map((row) => {
-        const bulanRaw = String(row["Bulan"] ?? row.bulan ?? "").trim();
-        // Kolom "Bulan" di Excel bisa berisi angka (1-12), nama bulan penuh
-        // ("Februari", sesuai NAMA_BULAN yg dipakai saat export), atau
-        // singkatan ("Feb", sesuai BULAN_SINGKAT_ANOMALI) -- coba ketiganya.
+        // Kolom periode di Excel: "Bulan" utk SPH-SBS, "Triwulan" utk
+        // SPH-BST/TBF/TH (fallback ke "Bulan" juga diterima kalau file
+        // lama masih pakai nama kolom itu). Bisa berisi angka (1-12 atau
+        // 1-4), nama bulan penuh ("Februari"), atau singkatan
+        // ("Feb"/"Tw2") -- coba semuanya.
+        const periodeRaw = String(
+          (jenisAdalahBulan ? (row["Bulan"] ?? row.bulan) : (row["Triwulan"] ?? row.triwulan ?? row["Bulan"] ?? row.bulan)) ?? ""
+        ).trim();
+        const maxVal = jenisAdalahBulan ? 12 : 4;
         let bulanVal = null;
-        if (bulanRaw !== "") {
-          const angka = Number(bulanRaw);
-          if (!Number.isNaN(angka) && angka >= 1 && angka <= 12) {
-            bulanVal = angka;
-          } else {
-            const idxPenuh = NAMA_BULAN.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
-            const idxSingkat = BULAN_SINGKAT_ANOMALI.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
+        if (periodeRaw !== "") {
+          const angkaMurni = /^[0-9]+$/.test(periodeRaw) ? Number(periodeRaw) : NaN;
+          if (!Number.isNaN(angkaMurni) && angkaMurni >= 1 && angkaMurni <= maxVal) {
+            bulanVal = angkaMurni;
+          } else if (jenisAdalahBulan) {
+            const idxPenuh = NAMA_BULAN.findIndex((n) => n.toLowerCase() === periodeRaw.toLowerCase());
+            const idxSingkat = daftarPeriodeSheet.findIndex((n) => n.toLowerCase() === periodeRaw.toLowerCase());
             if (idxPenuh > 0) bulanVal = idxPenuh; // NAMA_BULAN index 0 = "" (kosong), jadi index = nomor bulan
             else if (idxSingkat >= 0) bulanVal = idxSingkat + 1;
+          } else {
+            const idxSingkat = daftarPeriodeSheet.findIndex((n) => n.toLowerCase() === periodeRaw.toLowerCase());
+            if (idxSingkat >= 0) {
+              bulanVal = idxSingkat + 1;
+            } else {
+              // Fallback: teks campuran spt "Triwulan 2" -- ambil angka di dalamnya
+              const angkaDalamTeks = Number((periodeRaw.match(/[0-9]+/) || [])[0]);
+              if (!Number.isNaN(angkaDalamTeks) && angkaDalamTeks >= 1 && angkaDalamTeks <= maxVal) bulanVal = angkaDalamTeks;
+            }
           }
         }
         return {
@@ -2577,15 +2611,18 @@ const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 22 }, { wch: 12 }, { 
 
 // Helper: tulis 1 sheet Anomali dari array rows (dipakai baik utk
 // download per-kab-semua-SPH maupun backup-semua-data-global).
-function tulisSheetAnomaliDariRows(wb, sheetName, rows) {
+function tulisSheetAnomaliDariRows(wb, sheetName, rows, jenis) {
   const ws = {};
-  const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: ANOMALI_HEADERS.length - 1 } };
+  const headers = [...ANOMALI_HEADERS];
+  headers[3] = labelKolomPeriodeAnomali(jenis); // "Bulan" (SBS) atau "Triwulan" (BST/TBF/TH)
+  const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } };
   const setCell = (r, c, cell) => { ws[XLSX.utils.encode_cell({ r, c })] = cell; };
 
-  ANOMALI_HEADERS.forEach((h, c) => setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" })));
+  headers.forEach((h, c) => setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" })));
+  const daftarPeriode = daftarPeriodeAnomali(jenis);
   rows.forEach((r, i) => {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
-    const bulanLabel = r.bulan ? (NAMA_BULAN[r.bulan] || r.bulan) : "";
+    const bulanLabel = r.bulan ? (daftarPeriode[r.bulan - 1] || r.bulan) : "";
     const kabEntryRow = DAFTAR_KAB_BABEL.find((k) => k.id === r.kab_id);
     const labelKabRow = kabEntryRow ? kabEntryRow.nama : (r.kab_id || "");
     const vals = [
@@ -2619,7 +2656,7 @@ async function downloadAnomaliExcel() {
       );
       if (!rows || rows.length === 0) continue;
       adaData = true;
-      tulisSheetAnomaliDariRows(wb, SPH_CONFIG[jenis].label, rows);
+      tulisSheetAnomaliDariRows(wb, SPH_CONFIG[jenis].label, rows, jenis);
     }
   } catch (e) {
     alert("Gagal mengambil data: " + e.message);
@@ -2758,7 +2795,7 @@ async function downloadBackupSemuaAnomali() {
     const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
     const labelKab = kabEntry ? kabEntry.nama : kabId;
     const sheetLabel = (SPH_CONFIG[jenis]?.label || jenis.toUpperCase()) + "_" + labelKab;
-    tulisSheetAnomaliDariRows(wb, sheetLabel, groupRows);
+    tulisSheetAnomaliDariRows(wb, sheetLabel, groupRows, jenis);
   }
 
   const tanggal = new Date().toISOString().slice(0, 10);
