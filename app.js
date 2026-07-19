@@ -16,6 +16,7 @@ const state = {
 
 const TAHUN_AWAL = 2018;
 const TAHUN_SEKARANG = new Date().getFullYear();
+const KAB_ANOMALI_LIST = ["Bangka", "Belitung", "Bangka Barat", "Bangka Tengah", "Bangka Selatan", "Belitung Timur", "Kota Pangkalpinang"];
 
 // ============================================================
 // PENTING — fetchAllRows()
@@ -229,6 +230,11 @@ async function masukKeApp() {
       DAFTAR_KAB_BABEL.map((k) => `<option value="${k.id}">${k.nama}</option>`).join("");
   }
 
+  // Bersihkan data Konfirmasi Anomali dari triwulan sebelumnya (kalau ada)
+  try { await supabase.rpc("bersihkan_anomali_lama"); } catch (e) { /* diamkan, tidak kritis */ }
+
+  siapkanSlicerAnomali();
+
   await muatReferensiIdTanaman();
   await siapkanKabSelect();
   await muatUlangJenis();
@@ -265,6 +271,7 @@ function keluarDariApp() {
   // Reset panel kanan balik ke view Rekonsiliasi
   gantiView("rekon");
   $("rangkuman-area").innerHTML = `<div class="placeholder-kosong">Pilih jenis SPH, tahun & kabupaten untuk mulai.</div>`;
+  $("anomali-area").innerHTML = `<div class="placeholder-kosong">Pilih jenis SPH & kabupaten untuk mulai.</div>`;
 }
 
 $("btn-login").addEventListener("click", login);
@@ -313,15 +320,18 @@ $("btn-logout").addEventListener("click", async () => {
 // TOGGLE PANEL KANAN: Rekonsiliasi <-> Rangkuman
 // ============================================================
 function gantiView(view) {
-  const keRekon = view === "rekon";
-  $("view-rekon").classList.toggle("hidden", !keRekon);
-  $("view-rangkuman").classList.toggle("hidden", keRekon);
-  $("btn-view-rekon").classList.toggle("aktif", keRekon);
-  $("btn-view-rangkuman").classList.toggle("aktif", !keRekon);
-  if (!keRekon && state.profile) muatRangkuman();
+  $("view-rekon").classList.toggle("hidden", view !== "rekon");
+  $("view-rangkuman").classList.toggle("hidden", view !== "rangkuman");
+  $("view-anomali").classList.toggle("hidden", view !== "anomali");
+  $("btn-view-rekon").classList.toggle("aktif", view === "rekon");
+  $("btn-view-rangkuman").classList.toggle("aktif", view === "rangkuman");
+  $("btn-view-anomali").classList.toggle("aktif", view === "anomali");
+  if (view === "rangkuman" && state.profile) muatRangkuman();
+  if (view === "anomali" && state.profile) muatAnomali();
 }
 $("btn-view-rekon").addEventListener("click", () => gantiView("rekon"));
 $("btn-view-rangkuman").addEventListener("click", () => gantiView("rangkuman"));
+$("btn-view-anomali").addEventListener("click", () => gantiView("anomali"));
 
 // ============================================================
 // PANEL KIRI: DOWNLOAD DATA (baca dari database, export ke Excel)
@@ -1627,6 +1637,282 @@ async function downloadRangkumanExcel() {
 }
 
 $("btn-download-rangkuman").addEventListener("click", downloadRangkumanExcel);
+
+// ============================================================
+// PANEL KANAN — VIEW: KONFIRMASI ANOMALI
+// ============================================================
+$("sel-jenis-anomali").addEventListener("change", muatAnomali);
+$("sel-kab-anomali").addEventListener("change", muatAnomali);
+
+function isProv() { return state.profile?.role === "prov"; }
+
+function siapkanSlicerAnomali() {
+  const selKab = $("sel-kab-anomali");
+  if (isProv()) {
+    selKab.disabled = false;
+    selKab.innerHTML = KAB_ANOMALI_LIST.map((k) => {
+      const entry = DAFTAR_KAB_BABEL.find((d) => d.id === k);
+      return `<option value="${k}">${entry ? entry.nama : k}</option>`;
+    }).join("");
+  } else {
+    const namakabDB = state.profile.kab_id;
+    const entry = DAFTAR_KAB_BABEL.find((d) => d.id === namakabDB);
+    selKab.innerHTML = `<option value="${namakabDB}">${entry ? entry.nama : namakabDB}</option>`;
+    selKab.disabled = true;
+  }
+  $("anomali-toolbar-prov").classList.toggle("hidden", !isProv());
+  $("anomali-toolbar-kabkot").classList.toggle("hidden", isProv());
+}
+
+async function muatAnomali() {
+  if (!state.profile) return;
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+  const area = $("anomali-area");
+  if (!kabId) return;
+
+  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
+
+  let rows;
+  try {
+    rows = await fetchAllRows((from, to) =>
+      supabase
+        .from("konfirmasi_anomali")
+        .select("*")
+        .eq("jenis", jenis).eq("kab_id", kabId)
+        .order("no_urut", { ascending: true })
+        .range(from, to)
+    );
+  } catch (e) {
+    area.innerHTML = `<div class="placeholder-kosong">Gagal memuat data: ${e.message}</div>`;
+    return;
+  }
+  renderAnomali(rows || []);
+}
+
+function renderAnomali(rows) {
+  const area = $("anomali-area");
+  const prov = isProv();
+
+  if (rows.length === 0 && !prov) {
+    area.innerHTML = `<div class="placeholder-kosong">Belum ada anomali yang ditandai Provinsi untuk kombinasi ini.</div>`;
+    return;
+  }
+
+  const tbl = document.createElement("table");
+  tbl.className = "tabel-anomali";
+  tbl.innerHTML = `
+    <thead><tr>
+      <th class="col-periode">Periode</th>
+      <th class="col-no">No</th>
+      <th>Nama Komoditi</th>
+      <th>Kalimat Anomali</th>
+      <th>Konfirmasi Kabkot</th>
+      <th>Approval Provinsi</th>
+      <th>Konfirmasi Ulang</th>
+      ${prov ? `<th class="col-hapus"></th>` : ``}
+    </tr></thead>`;
+  const tbody = document.createElement("tbody");
+
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.dataset.id = r.id;
+
+    const tdPeriode = editableTd(r.periode_teks ?? "", "periode_teks", prov, false);
+    tdPeriode.classList.add("col-periode");
+    const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
+    tdNo.classList.add("col-no");
+    const tdKomoditi = editableTd(r.nama_komoditi ?? "", "nama_komoditi", prov, false);
+    const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
+    const tdKabkot = editableTd(r.konfirmasi_kabkot ?? "", "konfirmasi_kabkot", !prov, false);
+
+    const tdApproval = document.createElement("td");
+    if (prov) {
+      const sel = document.createElement("select");
+      sel.className = "sel-approval approval-" + (r.approval_provinsi || "kosong");
+      sel.innerHTML = `
+        <option value="" ${!r.approval_provinsi ? "selected" : ""}>— Belum —</option>
+        <option value="ya" ${r.approval_provinsi === "ya" ? "selected" : ""}>Ya</option>
+        <option value="tidak" ${r.approval_provinsi === "tidak" ? "selected" : ""}>Tidak</option>`;
+      sel.addEventListener("change", async () => {
+        sel.className = "sel-approval approval-" + (sel.value || "kosong");
+        await simpanKolomAnomali(r.id, "approval_provinsi", sel.value);
+      });
+      tdApproval.appendChild(sel);
+    } else {
+      tdApproval.textContent = r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "— Belum —";
+      tdApproval.classList.add("terkunci");
+    }
+
+    // Konfirmasi Ulang cuma bisa diisi kabkot, DAN cuma kalau approval = "tidak"
+    const bolehIsiUlang = !prov && r.approval_provinsi === "tidak";
+    const tdUlang = editableTd(r.konfirmasi_ulang ?? "", "konfirmasi_ulang", bolehIsiUlang, false);
+
+    tr.appendChild(tdPeriode);
+    tr.appendChild(tdNo);
+    tr.appendChild(tdKomoditi);
+    tr.appendChild(tdKalimat);
+    tr.appendChild(tdKabkot);
+    tr.appendChild(tdApproval);
+    tr.appendChild(tdUlang);
+
+    if (prov) {
+      const tdHapus = document.createElement("td");
+      tdHapus.className = "col-hapus";
+      tdHapus.innerHTML = `<button class="btn-hapus-baris" title="Hapus baris">✕</button>`;
+      tdHapus.querySelector("button").addEventListener("click", () => hapusBarisAnomali(r.id, tr));
+      tr.appendChild(tdHapus);
+    }
+
+    tbody.appendChild(tr);
+  });
+
+  tbl.appendChild(tbody);
+  area.innerHTML = "";
+  area.appendChild(tbl);
+}
+
+function editableTd(value, field, editable, isNumber) {
+  const td = document.createElement("td");
+  td.textContent = value;
+  if (!editable) {
+    td.classList.add("terkunci");
+    return td;
+  }
+  td.contentEditable = "true";
+  td.addEventListener("blur", async () => {
+    let v = td.textContent.trim();
+    if (isNumber) v = Number(v) || 0;
+    const tr = td.closest("tr");
+    await simpanKolomAnomali(Number(tr.dataset.id), field, v);
+  });
+  return td;
+}
+
+async function simpanKolomAnomali(id, field, value) {
+  try {
+    const { error } = await supabase.from("konfirmasi_anomali").update({ [field]: value }).eq("id", id);
+    if (error) throw error;
+  } catch (e) {
+    alert("Gagal menyimpan: " + e.message);
+  }
+}
+
+async function hapusBarisAnomali(id, trEl) {
+  if (!confirm("Hapus baris ini?")) return;
+  try {
+    const { error } = await supabase.from("konfirmasi_anomali").delete().eq("id", id);
+    if (error) throw error;
+    trEl.remove();
+  } catch (e) {
+    alert("Gagal menghapus: " + e.message);
+  }
+}
+
+$("btn-tambah-baris-anomali")?.addEventListener("click", async () => {
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+  const rowsSaatIni = $("anomali-area").querySelectorAll("tbody tr").length;
+
+  try {
+    const { error } = await supabase.from("konfirmasi_anomali").insert({
+      jenis, kab_id: kabId,
+      no_urut: rowsSaatIni + 1,
+      periode_teks: "",
+      nama_komoditi: "", kalimat_anomali: "",
+    });
+    if (error) throw error;
+    await muatAnomali();
+  } catch (e) {
+    alert("Gagal menambah baris: " + e.message);
+  }
+});
+
+// ---- Upload Excel (khusus prov): kolom Periode, No, Nama Komoditi, Kalimat Anomali ----
+$("in-file-anomali")?.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rowsSheet = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    const daftar = rowsSheet.map((row, i) => ({
+      jenis, kab_id: kabId,
+      periode_teks: String(row["Periode"] ?? row.periode ?? "").trim(),
+      no_urut: Number(row.No ?? row.no ?? i + 1) || (i + 1),
+      nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
+      kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
+    })).filter((r) => r.nama_komoditi || r.kalimat_anomali);
+
+    if (daftar.length === 0) {
+      alert("Tidak ada baris valid di file Excel. Pastikan ada kolom 'Periode', 'No', 'Nama Komoditi', 'Kalimat Anomali'.");
+      return;
+    }
+
+    const { error } = await supabase.from("konfirmasi_anomali").insert(daftar);
+    if (error) throw error;
+    await muatAnomali();
+  } catch (err) {
+    alert("Gagal upload Excel: " + err.message);
+  } finally {
+    e.target.value = "";
+  }
+});
+
+// ---- Download Excel (prov & kabkot) ----
+$("btn-download-anomali")?.addEventListener("click", downloadAnomaliExcel);
+$("btn-download-anomali-kabkot")?.addEventListener("click", downloadAnomaliExcel);
+
+async function downloadAnomaliExcel() {
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+
+  let rows;
+  try {
+    rows = await fetchAllRows((from, to) =>
+      supabase.from("konfirmasi_anomali").select("*")
+        .eq("jenis", jenis).eq("kab_id", kabId)
+        .order("no_urut", { ascending: true }).range(from, to)
+    );
+  } catch (e) {
+    alert("Gagal mengambil data: " + e.message);
+    return;
+  }
+  if (!rows || rows.length === 0) {
+    alert("Tidak ada data untuk didownload.");
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  const headers = ["Periode", "No", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi", "Konfirmasi Ulang"];
+  const ws = {};
+  const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } };
+  const setCell = (r, c, cell) => { ws[XLSX.utils.encode_cell({ r, c })] = cell; };
+
+  headers.forEach((h, c) => setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" })));
+  rows.forEach((r, i) => {
+    const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
+    const vals = [
+      r.periode_teks, r.no_urut, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
+      r.konfirmasi_ulang,
+    ];
+    vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c <= 1 ? "center" : "left", bgColor: stripeBg })));
+  });
+
+  ws["!ref"] = XLSX.utils.encode_range(range);
+  ws["!cols"] = [{ wch: 12 }, { wch: 6 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, "Anomali");
+
+  const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
+  const labelKab = (kabEntry ? kabEntry.nama : kabId).replace(/\s+/g, "");
+  XLSX.writeFile(wb, `KonfirmasiAnomali_${jenis.toUpperCase()}_${labelKab}.xlsx`, { cellStyles: true });
+}
 
 // ============================================================
 // Mulai

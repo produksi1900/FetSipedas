@@ -478,3 +478,48 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
   table.tabel-rekon { font-size: 12px; min-width: 520px; }
   table.tabel-rekon th, table.tabel-rekon td { padding: 4px 6px; }
 }
+
+/* ---------- Konfirmasi Anomali ---------- */
+.anomali-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.anomali-toolbar .btn-kecil { width: auto; padding: 7px 12px; font-size: 12px; }
+.btn-file-label { cursor: pointer; display: inline-flex; align-items: center; }
+.hidden-file-input { display: none; }
+
+table.tabel-anomali {
+  border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px;
+}
+table.tabel-anomali th, table.tabel-anomali td {
+  border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top;
+  background-color: var(--putih);
+}
+table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
+table.tabel-anomali td.col-no { text-align: center; width: 42px; }
+table.tabel-anomali td.col-periode, table.tabel-anomali th.col-periode {
+  width: 90px; white-space: nowrap;
+}
+table.tabel-anomali tr:nth-child(even) td { background-color: #f8f8f8; }
+
+table.tabel-anomali td[contenteditable="true"] {
+  cursor: text; min-width: 120px;
+}
+table.tabel-anomali td[contenteditable="true"]:focus {
+  outline: 2px solid var(--hijau-muda); outline-offset: -2px; background: #eafaf1;
+}
+table.tabel-anomali td.terkunci {
+  background-color: var(--abu2) !important; color: #999; font-style: italic;
+}
+table.tabel-anomali select.sel-approval {
+  width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
+}
+table.tabel-anomali select.sel-approval.approval-ya { background: #eafaf1; color: var(--hijau-tua); font-weight: bold; }
+table.tabel-anomali select.sel-approval.approval-tidak { background: #fdecea; color: var(--merah); font-weight: bold; }
+
+td.col-hapus { text-align: center; width: 34px; }
+.btn-hapus-baris {
+  border: none; background: transparent; color: var(--merah); cursor: pointer; font-size: 16px; line-height: 1;
+}
+.btn-hapus-baris:hover { opacity: .7; }
+
+.status-simpan-anomali {
+  font-size: 11px; color: #888; font-style: italic; margin-left: 6px;
+}

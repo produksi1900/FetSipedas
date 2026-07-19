@@ -151,6 +151,7 @@
         <div class="panel-toggle" id="panel-toggle">
           <button type="button" class="toggle-btn aktif" id="btn-view-rekon">Rekonsiliasi Data</button>
           <button type="button" class="toggle-btn" id="btn-view-rangkuman">Rangkuman Data</button>
+          <button type="button" class="toggle-btn" id="btn-view-anomali">Konfirmasi Anomali</button>
         </div>
 
         <!-- ===== VIEW: REKONSILIASI ===== -->
@@ -219,6 +220,43 @@
 
           <div id="rangkuman-area">
             <div class="placeholder-kosong">Pilih jenis SPH, tahun & kabupaten untuk mulai.</div>
+          </div>
+        </div>
+
+        <!-- ===== VIEW: KONFIRMASI ANOMALI ===== -->
+        <div id="view-anomali" class="hidden">
+          <div class="rekon-slicer">
+            <div class="field">
+              <label>Jenis SPH</label>
+              <select id="sel-jenis-anomali">
+                <option value="sbs">SPH-SBS</option>
+                <option value="bst">SPH-BST</option>
+                <option value="tbf">SPH-TBF</option>
+                <option value="th">SPH-TH</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Kabupaten</label>
+              <select id="sel-kab-anomali"></select>
+            </div>
+          </div>
+
+          <div class="anomali-toolbar" id="anomali-toolbar-prov">
+            <button class="btn-login btn-kecil" id="btn-tambah-baris-anomali">+ Tambah Baris</button>
+            <label class="btn-login btn-kecil btn-file-label" for="in-file-anomali">⬆ Upload Excel</label>
+            <input type="file" id="in-file-anomali" accept=".xlsx,.xls" class="hidden-file-input">
+            <button class="btn-login btn-kecil" id="btn-download-anomali">⬇ Download Excel</button>
+          </div>
+          <div class="anomali-toolbar" id="anomali-toolbar-kabkot">
+            <button class="btn-login btn-kecil" id="btn-download-anomali-kabkot">⬇ Download Excel</button>
+          </div>
+
+          <div class="catatan-kecil" style="margin: 0 0 8px;">
+            Data anomali otomatis terhapus setiap pergantian triwulan. Kolom "Periode" diisi manual oleh Provinsi (mis. "TW3 2026").
+          </div>
+
+          <div id="anomali-area">
+            <div class="placeholder-kosong">Pilih jenis SPH & kabupaten untuk mulai.</div>
           </div>
         </div>
 
