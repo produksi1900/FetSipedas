@@ -12,11 +12,13 @@ const state = {
   tabAktif: null,       // key tab rekon yang sedang dipilih
   chartInstances: [],   // instance-instance Chart.js aktif (di-destroy tiap render ulang)
   idTanamanUrutan: { sbs: {}, bst: {}, tbf: {}, th: {} }, // jenis -> {namatanaman_lower: urutan}
+  anomaliRows: [],   // baris anomali yang sedang dimuat (sebelum disort utk render)
+  anomaliSort: { kolom: "no_urut", arah: "asc" }, // sort aktif tabel Konfirmasi Anomali
 };
 
 const TAHUN_AWAL = 2018;
 const TAHUN_SEKARANG = new Date().getFullYear();
-const KAB_ANOMALI_LIST = ["Bangka", "Belitung", "Bangka Barat", "Bangka Tengah", "Bangka Selatan", "Belitung Timur", "Kota Pangkalpinang"];
+const KAB_ANOMALI_LIST = ["Bangka", "Belitung", "Bangka Barat", "Bangka Tengah", "Bangka Selatan", "Belitung Timur", "Kota Pangkal Pinang"];
 
 // ============================================================
 // PENTING — fetchAllRows()
@@ -1730,7 +1732,48 @@ async function muatAnomali() {
     area.innerHTML = `<div class="placeholder-kosong">Gagal memuat data: ${e.message}</div>`;
     return;
   }
-  renderAnomali(rows || []);
+  state.anomaliRows = rows || [];
+  renderAnomaliSorted();
+}
+
+// ---- Sorting tabel Konfirmasi Anomali ----
+// Kolom "bulan" WAJIB disort numerik dari nilai aslinya (1-12), BUKAN
+// dari label teksnya ("Jan","Feb",...) -- supaya urutannya benar
+// (Jan=1 s.d. Des=12), bukan alfabetis (Agu, Apr, Des, Feb, ...).
+const KOLOM_ANOMALI_SORTABLE = [
+  { key: "no_urut", label: "No", tipe: "angka" },
+  { key: "bulan", label: "Bulan", tipe: "angka" },
+  { key: "nama_komoditi", label: "Nama Komoditi", tipe: "teks" },
+  { key: "kalimat_anomali", label: "Anomali", tipe: "teks" },
+  { key: "konfirmasi_kabkot", label: null, tipe: "teks" }, // label kolom ini dinamis (nama kab), lihat renderAnomali
+  { key: "approval_provinsi", label: "Approval Provinsi", tipe: "teks" },
+];
+
+function bandingkanAnomali(a, b, kolom, tipe, arah) {
+  let va = a[kolom];
+  let vb = b[kolom];
+  if (tipe === "angka") {
+    // null/undefined selalu di bawah, terlepas arah sort
+    const na = va === null || va === undefined;
+    const nb = vb === null || vb === undefined;
+    if (na && nb) return 0;
+    if (na) return 1;
+    if (nb) return -1;
+    va = Number(va); vb = Number(vb);
+    return arah === "asc" ? va - vb : vb - va;
+  }
+  va = String(va ?? "").toLowerCase();
+  vb = String(vb ?? "").toLowerCase();
+  const cmp = va.localeCompare(vb, "id");
+  return arah === "asc" ? cmp : -cmp;
+}
+
+function renderAnomaliSorted() {
+  const { kolom, arah } = state.anomaliSort;
+  const info = KOLOM_ANOMALI_SORTABLE.find((k) => k.key === kolom);
+  const tipe = info ? info.tipe : "teks";
+  const rowsSorted = [...state.anomaliRows].sort((a, b) => bandingkanAnomali(a, b, kolom, tipe, arah));
+  renderAnomali(rowsSorted);
 }
 
 // Buat td dropdown Bulan -- SEKARANG bebas pilih semua 12 bulan (tidak
@@ -1977,16 +2020,35 @@ function renderAnomali(rows) {
 
   const tbl = document.createElement("table");
   tbl.className = "tabel-anomali";
-  tbl.innerHTML = `
-    <thead><tr>
-      <th class="col-no">No</th>
-      <th class="col-bulan">Bulan</th>
-      <th>Nama Komoditi</th>
-      <th>Anomali</th>
-      <th>Konfirmasi ${labelKab}</th>
-      <th>Approval Provinsi</th>
-      ${prov ? `<th class="col-hapus"></th>` : ``}
-    </tr></thead>`;
+
+  const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
+  const labelKolom = { no_urut: "No", bulan: "Bulan", nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  const clsExtra = { no_urut: "col-no", bulan: "col-bulan" };
+
+  const thead = document.createElement("thead");
+  const trHead = document.createElement("tr");
+  KOLOM_ANOMALI_SORTABLE.forEach(({ key, tipe }) => {
+    const th = document.createElement("th");
+    th.className = "th-sortable" + (clsExtra[key] ? " " + clsExtra[key] : "");
+    const panah = kolomAktif === key ? (arahAktif === "asc" ? " ▲" : " ▼") : "";
+    th.textContent = labelKolom[key] + panah;
+    th.addEventListener("click", () => {
+      if (state.anomaliSort.kolom === key) {
+        state.anomaliSort.arah = state.anomaliSort.arah === "asc" ? "desc" : "asc";
+      } else {
+        state.anomaliSort = { kolom: key, arah: "asc" };
+      }
+      renderAnomaliSorted();
+    });
+    trHead.appendChild(th);
+  });
+  if (prov) {
+    const thHapus = document.createElement("th");
+    thHapus.className = "col-hapus";
+    trHead.appendChild(thHapus);
+  }
+  thead.appendChild(trHead);
+  tbl.appendChild(thead);
   const tbody = document.createElement("tbody");
 
   rows.forEach((r) => {
@@ -2043,6 +2105,8 @@ function renderAnomali(rows) {
   area.innerHTML = "";
   area.appendChild(tbl);
 }
+// (catatan: thead & tbody sengaja dirakit terpisah di atas -- thead pakai
+// header sortable dgn event click, tbody isi baris data seperti biasa)
 
 function editableTd(value, field, editable, isNumber) {
   const td = document.createElement("td");

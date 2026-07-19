@@ -148,12 +148,16 @@ export const SPH_CONFIG = {
 // PENTING: "id" di sini WAJIB sama persis (termasuk kapitalisasi & spasi)
 // dengan isi kolom "nama_kab" di database Supabase, karena app.js
 // memfilter data pakai .eq("nama_kab", id) -- bukan pakai kode kabupaten.
-// Yang sudah dikonfirmasi lewat SQL: kab "01" -> nama_kab "Bangka".
-// 6 baris lainnya MASIH TEBAKAN pola yang sama (tanpa "Kab."/"Kota").
-// Begitu data kabupaten lain mulai tersinkron dari aplikasi desktop,
-// jalankan ulang query berikut di Supabase SQL Editor untuk memastikan:
-//   select distinct kab, nama_kab from data_sbs order by kab;
-// lalu cocokkan/perbaiki nilai "id" di bawah ini kalau ternyata beda.
+// Sudah dikonfirmasi lewat SQL langsung ke tabel data_* (bukan tebakan):
+//   select distinct kab, nama_kab from data_bst order by kab;
+// "Kota Pangkal Pinang" MEMAKAI SPASI antara "Pangkal" dan "Pinang" --
+// ini sempat salah ditulis "Kota Pangkalpinang" (tanpa spasi) di versi
+// lama, yang menyebabkan filter kabupaten ini gagal match dgn database
+// (lihat juga kab_id di tabel profiles & konfirmasi_anomali, WAJIB
+// disamakan persis ke "Kota Pangkal Pinang" juga -- lihat DEPLOY.md/SQL
+// migrasi terkait). Kalau ada kabupaten lain yang datanya baru mulai
+// tersinkron dari aplikasi desktop, jalankan ulang query di atas dan
+// cocokkan/perbaiki nilai "id" di bawah ini kalau ternyata beda.
 export const DAFTAR_KAB_BABEL = [
   { id: "Bangka", nama: "Kab. Bangka" },
   { id: "Belitung", nama: "Kab. Belitung" },
@@ -161,5 +165,5 @@ export const DAFTAR_KAB_BABEL = [
   { id: "Bangka Tengah", nama: "Kab. Bangka Tengah" },
   { id: "Bangka Selatan", nama: "Kab. Bangka Selatan" },
   { id: "Belitung Timur", nama: "Kab. Belitung Timur" },
-  { id: "Kota Pangkalpinang", nama: "Kota Pangkal Pinang" },
+  { id: "Kota Pangkal Pinang", nama: "Kota Pangkal Pinang" },
 ];
