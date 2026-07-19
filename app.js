@@ -2359,11 +2359,24 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
     const rowsSheet = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
     const daftar = rowsSheet.map((row, i) => {
-      const bulanRaw = row["Bulan"] ?? row.bulan ?? "";
-      const bulanVal = bulanRaw !== "" ? (Number(bulanRaw) || null) : null;
+      const bulanRaw = String(row["Bulan"] ?? row.bulan ?? "").trim();
+      // Kolom "Bulan" di Excel bisa berisi angka (1-12), nama bulan penuh
+      // ("Februari", sesuai NAMA_BULAN yg dipakai saat export), atau
+      // singkatan ("Feb", sesuai BULAN_SINGKAT_ANOMALI) -- coba ketiganya.
+      let bulanVal = null;
+      if (bulanRaw !== "") {
+        const angka = Number(bulanRaw);
+        if (!Number.isNaN(angka) && angka >= 1 && angka <= 12) {
+          bulanVal = angka;
+        } else {
+          const idxPenuh = NAMA_BULAN.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
+          const idxSingkat = BULAN_SINGKAT_ANOMALI.findIndex((n) => n.toLowerCase() === bulanRaw.toLowerCase());
+          if (idxPenuh > 0) bulanVal = idxPenuh; // NAMA_BULAN index 0 = "" (kosong), jadi index = nomor bulan
+          else if (idxSingkat >= 0) bulanVal = idxSingkat + 1;
+        }
+      }
       return {
         jenis, kab_id: kabId,
-        periode_teks: String(row["Periode"] ?? row.periode ?? "").trim(),
         no_urut: Number(row.No ?? row.no ?? i + 1) || (i + 1),
         bulan: bulanVal,
         nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
@@ -2372,7 +2385,7 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
     }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
 
     if (daftar.length === 0) {
-      alert("Tidak ada baris valid di file Excel. Pastikan ada kolom 'Periode', 'No', 'Nama Komoditi', 'Kalimat Anomali'.");
+      alert("Tidak ada baris valid di file Excel. Pastikan ada kolom 'No', 'Bulan', 'Nama Komoditi', 'Kalimat Anomali'.");
       return;
     }
 
@@ -2411,7 +2424,7 @@ async function downloadAnomaliExcel() {
   }
 
   const wb = XLSX.utils.book_new();
-  const headers = ["No", "Periode", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi", "Konfirmasi Ulang"];
+  const headers = ["No", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
   const ws = {};
   const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } };
   const setCell = (r, c, cell) => { ws[XLSX.utils.encode_cell({ r, c })] = cell; };
@@ -2421,15 +2434,14 @@ async function downloadAnomaliExcel() {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
     const bulanLabel = r.bulan ? (NAMA_BULAN[r.bulan] || r.bulan) : "";
     const vals = [
-      r.no_urut, r.periode_teks, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.no_urut, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
       r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
-      r.konfirmasi_ulang,
     ];
-    vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c <= 1 ? "center" : "left", bgColor: stripeBg })));
+    vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c === 0 ? "center" : "left", bgColor: stripeBg })));
   });
 
   ws["!ref"] = XLSX.utils.encode_range(range);
-  ws["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 30 }];
+  ws["!cols"] = [{ wch: 6 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, ws, "Anomali");
 
   const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
