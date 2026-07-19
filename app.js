@@ -2572,8 +2572,8 @@ $("btn-download-anomali-kabkot")?.addEventListener("click", downloadAnomaliExcel
 // file ini utk mengisi "Konfirmasi Kabkot" (lihat uploadKonfirmasiKabkot()).
 // JANGAN diubah/dihapus user, dan JANGAN dipakai utk baris baru yang
 // ditambah manual di Excel (baris tanpa ID otomatis dilewati saat upload).
-const ANOMALI_HEADERS = ["ID", "No", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
-const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
+const ANOMALI_HEADERS = ["ID", "No", "Kabupaten/Kota", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
+const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 22 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
 
 // Helper: tulis 1 sheet Anomali dari array rows (dipakai baik utk
 // download per-kab-semua-SPH maupun backup-semua-data-global).
@@ -2586,8 +2586,10 @@ function tulisSheetAnomaliDariRows(wb, sheetName, rows) {
   rows.forEach((r, i) => {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
     const bulanLabel = r.bulan ? (NAMA_BULAN[r.bulan] || r.bulan) : "";
+    const kabEntryRow = DAFTAR_KAB_BABEL.find((k) => k.id === r.kab_id);
+    const labelKabRow = kabEntryRow ? kabEntryRow.nama : (r.kab_id || "");
     const vals = [
-      r.id, r.no_urut, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.id, r.no_urut, labelKabRow, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
       r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
     ];
     vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c <= 1 ? "center" : "left", bgColor: stripeBg })));
@@ -2803,8 +2805,9 @@ async function bukaDashboardAnomali() {
 // ngepas/rapat. Kalau total 0, persentase ditampilkan "-" supaya tidak
 // muncul NaN%.
 function fmtCountPct(count, total) {
-  const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0.0";
-  return `${count}<span class="pct">(${pct}%)</span>`;
+  const pctVal = total > 0 ? Math.round((count / total) * 100) : 0;
+  const warna = pctVal >= 100 ? "color:var(--hijau-muda);" : "color:var(--merah);";
+  return `${count}<span class="pct" style="${warna}">(${pctVal}%)</span>`;
 }
 
 function renderDashboardAnomali(rows, kabList) {
@@ -2877,10 +2880,10 @@ function renderDashboardAnomali(rows, kabList) {
         <td class="sph-cell">${SPH_CONFIG[jenis].label}</td>
         <td>${s.total}</td>
         <td>${fmtCountPct(s.sudahKonfirmasi, s.total)}</td>
-        <td>${fmtCountPct(s.belumKonfirmasi, s.total)}</td>
-        <td>${fmtCountPct(s.approvalYa, s.total)}</td>
-        <td>${fmtCountPct(s.approvalTidak, s.total)}</td>
-        <td>${fmtCountPct(s.approvalBelum, s.total)}</td>
+        <td>${s.belumKonfirmasi}</td>
+        <td>${s.approvalYa}</td>
+        <td>${s.approvalTidak}</td>
+        <td>${s.approvalBelum}</td>
       </tr>`;
     });
   }
@@ -2914,10 +2917,10 @@ function renderDashboardAnomali(rows, kabList) {
             <td colspan="2">TOTAL</td>
             <td>${totalRow.total}</td>
             <td>${fmtCountPct(totalRow.sudahKonfirmasi, totalRow.total)}</td>
-            <td>${fmtCountPct(totalRow.belumKonfirmasi, totalRow.total)}</td>
-            <td>${fmtCountPct(totalRow.approvalYa, totalRow.total)}</td>
-            <td>${fmtCountPct(totalRow.approvalTidak, totalRow.total)}</td>
-            <td>${fmtCountPct(totalRow.approvalBelum, totalRow.total)}</td>
+            <td>${totalRow.belumKonfirmasi}</td>
+            <td>${totalRow.approvalYa}</td>
+            <td>${totalRow.approvalTidak}</td>
+            <td>${totalRow.approvalBelum}</td>
           </tr>
         </tbody>
       </table>
