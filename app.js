@@ -2111,7 +2111,14 @@ function renderAnomali(rows) {
 
   const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
   const labelKolom = { no_urut: "No", bulan: "Bulan", nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
-  const clsExtra = { no_urut: "col-no", bulan: "col-bulan" };
+  const clsExtra = {
+    no_urut: "col-no",
+    bulan: "col-bulan",
+    nama_komoditi: "col-komoditi",
+    kalimat_anomali: "col-anomali",
+    konfirmasi_kabkot: "col-kabkot",
+    approval_provinsi: "col-approval",
+  };
 
   const thead = document.createElement("thead");
   const trHead = document.createElement("tr");
@@ -2173,10 +2180,14 @@ function renderAnomali(rows) {
     tdBulan.classList.add("td-bulan", "col-bulan");
 
     const tdKomoditi = buatTdKomoditi(r.id, r.nama_komoditi ?? "", prov);
+    tdKomoditi.classList.add("col-komoditi");
     const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
+    tdKalimat.classList.add("col-anomali");
     const tdKabkot = editableTd(r.konfirmasi_kabkot ?? "", "konfirmasi_kabkot", !prov, false);
+    tdKabkot.classList.add("col-kabkot");
 
     const tdApproval = document.createElement("td");
+    tdApproval.classList.add("col-approval");
     if (prov) {
       const sel = document.createElement("select");
       sel.className = "sel-approval approval-" + (r.approval_provinsi || "kosong");
@@ -2305,7 +2316,6 @@ async function hapusTerpilihAnomali() {
     alert("Belum ada baris yang dipilih (centang dulu di kolom sebelah No).");
     return;
   }
-  if (!confirm(`Hapus ${checked.length} baris anomali terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
 
   const ids = checked.map((c) => Number(c.dataset.id));
   const jenis = $("sel-jenis-anomali").value;

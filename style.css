@@ -536,28 +536,27 @@ table.tabel-anomali td.terkunci {
   cursor: default;
 }
 
-table.tabel-anomali th:nth-child(3), table.tabel-anomali td:nth-child(3) {
-  width: 160px; min-width: 140px;
-}
 table.tabel-anomali td.col-hapus, table.tabel-anomali th.col-hapus {
   width: 34px; min-width: 34px;
 }
-/* Kolom Approval Provinsi (kolom terakhir sebelum tombol hapus)
-   dilebarin dikit + text-align center supaya select "— Belum — / Ya /
-   Tidak" dan judul headernya muat rapi tanpa kepotong per-kata. */
-table.tabel-anomali th:nth-child(6), table.tabel-anomali td:nth-child(6) {
-  width: 130px; min-width: 120px; text-align: center;
+/* Lebar kolom dikunci pakai CLASS (bukan nth-child) supaya tidak
+   bergeser/salah sasaran waktu kolom checkbox (khusus role Provinsi)
+   ikut ditambahkan sebagai kolom pertama -- nth-child akan menghitung
+   ulang posisi & jadi salah kena kolom lain. Nama Komoditi diberi lebar
+   ngepas (bukan persen), Anomali & Konfirmasi Kab/Kot dilebarkan (paling
+   penting utk dibaca/ditulis), Approval Provinsi dikunci ngepas +
+   center. */
+table.tabel-anomali td.col-komoditi, table.tabel-anomali th.col-komoditi {
+  width: 170px; min-width: 150px;
 }
-/* Kolom Anomali & Konfirmasi dilebarin -- ini yang paling penting utk
-   dibaca/ditulis, jadi kasih porsi lebih lebar drpd kolom lain. */
-table.tabel-anomali th:nth-child(4), table.tabel-anomali td:nth-child(4) {
-  min-width: 260px; width: 32%;
+table.tabel-anomali td.col-anomali, table.tabel-anomali th.col-anomali {
+  min-width: 260px; width: 34%;
 }
-table.tabel-anomali th:nth-child(5), table.tabel-anomali td:nth-child(5) {
-  min-width: 220px; width: 28%;
+table.tabel-anomali td.col-kabkot, table.tabel-anomali th.col-kabkot {
+  min-width: 220px; width: 30%;
 }
-table.tabel-anomali th:nth-child(6), table.tabel-anomali td:nth-child(6) {
-  width: 120px; min-width: 110px;
+table.tabel-anomali td.col-approval, table.tabel-anomali th.col-approval {
+  width: 120px; min-width: 110px; text-align: center;
 }
 table.tabel-anomali select.sel-approval {
   width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
