@@ -234,6 +234,12 @@ body { display: flex; flex-direction: column; }
   overflow-y: auto;
   padding-right: 2px; /* kasih sedikit jarak dari scrollbar */
 }
+/* #anomali-area SENDIRI (bukan wrapper di dalamnya, lihat komentar di
+   .dashboard-anomali-scroll di bawah) yang menangani scroll horizontal
+   utk tabel Dashboard Anomali yang lebar -- supaya th sticky (top:0)
+   pada tabel Dashboard tetap nempel relatif ke #anomali-area yang sama
+   persis dgn scroll vertikalnya, bukan ke kontainer lain. */
+#anomali-area { overflow-x: auto; }
 /* Rangkuman cuma punya 1 tabel (beda dgn Rekon yang bisa banyak tabel
    ditumpuk), jadi biarkan .tabel-scroll di dalamnya saja yang scroll
    vertikal. Kalau #rangkuman-area sendiri JUGA overflow-y:auto, jadinya
@@ -663,7 +669,23 @@ table.tabel-dashboard-anomali tr.baris-total-dashboard td {
 }
 /* Kolom "Kabupaten" (freeze pakai rowspan) ikut digelapin dikit biar
    beda dgn baris data biasa waktu ketiban baris TOTAL di sebelahnya. */
+/* PENTING: kotak ini SENGAJA TIDAK diberi overflow-x/overflow-y sendiri
+   lagi (dulu overflow-x:auto di sini). Kalau overflow-x diisi di sini
+   sementara overflow-y dibiarkan default, browser otomatis menghitung
+   overflow-y jadi "auto" juga (aturan resmi CSS Overflow) -- akibatnya
+   kotak ini diam2 jadi kontainer scroll TERSENDIRI, dan header tabel yg
+   sticky (th { position:sticky; top:0 }) jadi nempel relatif ke kotak
+   ini (yang ikut kegulung ke atas bareng scroll induknya), BUKAN ke
+   #anomali-area -- makanya header kolom malah hilang pas discroll,
+   bukannya freeze di atas. Scroll horizontal utk tabel lebar ini
+   sekarang ditangani #anomali-area langsung (lihat aturan di atas). */
 .dashboard-anomali-scroll {
-  overflow-x: auto;
   border: 1px solid #e0e0e0; border-radius: 6px;
+  /* inline-block + min-width:100% -- kotak ini otomatis melebar
+     mengikuti tabel di dalamnya (yg bisa lebih lebar dari layar), sama
+     pola kayak .tabel-konten di panel Rekon -- supaya border/sudut
+     rounded-nya ikut sampai ujung kanan tabel waktu discroll ke
+     samping, bukan berhenti duluan di lebar layar. */
+  display: inline-block;
+  min-width: 100%;
 }
