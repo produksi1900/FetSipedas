@@ -499,13 +499,19 @@ table.tabel-anomali th, table.tabel-anomali td {
   border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top;
   background-color: var(--putih);
   white-space: normal;
+}
+/* word-break paksa cuma dipakai di SEL ISIAN (td) -- supaya teks
+   panjang tanpa spasi tetap patah ke bawah. Header (th) sengaja TIDAK
+   dikasih ini, supaya "Approval Provinsi" wrap normal per-kata, bukan
+   kepotong di tengah kata jadi "Appr/oval". */
+table.tabel-anomali td {
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 table.tabel-anomali { table-layout: fixed; }
 table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
 table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
-  text-align: center; width: 30px; min-width: 30px;
+  text-align: center; width: 42px; min-width: 42px; white-space: nowrap;
 }
 table.tabel-anomali td.col-bulan, table.tabel-anomali th.col-bulan {
   width: 92px; min-width: 84px; white-space: nowrap;
@@ -530,6 +536,12 @@ table.tabel-anomali th:nth-child(3), table.tabel-anomali td:nth-child(3) {
 }
 table.tabel-anomali td.col-hapus, table.tabel-anomali th.col-hapus {
   width: 34px; min-width: 34px;
+}
+/* Kolom Approval Provinsi (kolom terakhir sebelum tombol hapus)
+   dilebarin dikit + text-align center supaya select "— Belum — / Ya /
+   Tidak" dan judul headernya muat rapi tanpa kepotong per-kata. */
+table.tabel-anomali th:nth-child(6), table.tabel-anomali td:nth-child(6) {
+  width: 130px; min-width: 120px; text-align: center;
 }
 /* Kolom Anomali & Konfirmasi dilebarin -- ini yang paling penting utk
    dibaca/ditulis, jadi kasih porsi lebih lebar drpd kolom lain. */
