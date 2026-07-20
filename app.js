@@ -148,7 +148,7 @@ async function masukKeApp() {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, username, role, kab_id, nama_tampil")
+    .select("id, username, role, kab_id, nama_tampil, akses_terbatas")
     .eq("id", user.id)
     .single();
 
@@ -188,8 +188,10 @@ async function masukKeApp() {
 
   isiPilihanTahun($("sel-tahun-rekon"));
 
-  // ---- Upload Referensi ID Tanaman (khusus prov), ditaruh di toolbar atas ----
-  $("wrap-referensi").classList.toggle("hidden", profile.role !== "prov");
+  // ---- Upload Referensi ID Tanaman (khusus prov, dan BUKAN prov yang
+  // "akses_terbatas" -- akun seperti sph1900 tampilannya sama seperti
+  // provinsi biasa, tapi tidak boleh mengubah referensi ID Tanaman). ----
+  $("wrap-referensi").classList.toggle("hidden", profile.role !== "prov" || profile.akses_terbatas === true);
 
   // ---- Panel Rangkuman: siapkan pilihan tahun & kabupaten ----
   isiPilihanTahun($("sel-tahun-rangkuman"));
@@ -1658,6 +1660,14 @@ $("sel-kab-anomali").addEventListener("change", muatAnomali);
 
 function isProv() { return state.profile?.role === "prov"; }
 
+// Akun provinsi "terbatas" (mis. sph1900): tampilannya SAMA seperti
+// provinsi biasa (role tetap "prov", bisa lihat semua kab, download
+// Excel, edit/approve baris yang sudah ada), TAPI tidak boleh menambah
+// baris baru & tidak boleh upload Excel massal di Konfirmasi Anomali,
+// serta tidak boleh upload Referensi ID Tanaman di panel Rekon (lihat
+// masukKeApp()). Ditandai lewat kolom profiles.akses_terbatas di DB.
+function isProvTerbatas() { return isProv() && state.profile?.akses_terbatas === true; }
+
 // Hitung TW saat ini berdasarkan bulan sekarang (dipakai sbg default
 // pilihan di popup "Tambah Baris", & fallback saat parsing periode_teks).
 function twSekarang() {
@@ -1755,6 +1765,16 @@ function siapkanSlicerAnomali() {
   }
   $("anomali-toolbar-prov").classList.toggle("hidden", !isProv());
   $("anomali-toolbar-kabkot").classList.toggle("hidden", isProv());
+
+  // Khusus prov "akses_terbatas" (mis. sph1900): sembunyikan tombol
+  // "+ Tambah Baris" & "Upload Excel" -- sisanya (download, hapus
+  // terpilih, hapus semua, dashboard, edit/approve baris yang sudah
+  // ada) tetap seperti provinsi biasa.
+  if (isProv()) {
+    const terbatas = isProvTerbatas();
+    $("btn-buka-tambah-anomali").classList.toggle("hidden", terbatas);
+    $("lbl-upload-anomali").classList.toggle("hidden", terbatas);
+  }
 }
 
 async function muatAnomali() {
