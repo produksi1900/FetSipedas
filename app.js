@@ -14,6 +14,7 @@ const state = {
   idTanamanUrutan: { sbs: {}, bst: {}, tbf: {}, th: {} }, // jenis -> {namatanaman_lower: urutan}
   anomaliRows: [],   // baris anomali yang sedang dimuat (sebelum disort utk render)
   anomaliSort: { kolom: "no_urut", arah: "asc" }, // sort aktif tabel Konfirmasi Anomali
+  kecamatanPerKab: {}, // cache: kab_id -> [nama_kec, ...] (utk dropdown Kecamatan di Anomali)
 };
 
 const TAHUN_AWAL = 2018;
@@ -1691,6 +1692,31 @@ function daftarKomoditiAnomali() {
   return namaAsli;
 }
 
+// Ambil daftar nama kecamatan utk 1 kabupaten (dipakai dropdown Kecamatan
+// di Konfirmasi Anomali) -- diambil dari data_* yang sudah tersinkron
+// (gabungan semua jenis SPH, supaya lengkap), lalu di-cache per kab_id
+// biar tidak query ulang tiap render.
+async function muatKecamatanKab(kabId) {
+  if (state.kecamatanPerKab[kabId]) return state.kecamatanPerKab[kabId];
+  const tabel = ["data_sbs", "data_bst", "data_tbf", "data_th"];
+  let semua = [];
+  for (const t of tabel) {
+    try {
+      const rows = await fetchAllRows((from, to) =>
+        supabase.from(t).select("nama_kec, urutkec").eq("nama_kab", kabId).range(from, to)
+      );
+      semua = semua.concat(rows || []);
+    } catch (e) { /* tabel/kab ini mungkin belum ada data -- lewati */ }
+  }
+  const map = new Map();
+  for (const r of semua) {
+    if (r.nama_kec && !map.has(r.nama_kec)) map.set(r.nama_kec, r.urutkec ?? 0);
+  }
+  const list = Array.from(map.entries()).sort((a, b) => a[1] - b[1]).map(([nama]) => nama);
+  state.kecamatanPerKab[kabId] = list;
+  return list;
+}
+
 function siapkanSlicerAnomali() {
   const selKab = $("sel-kab-anomali");
   if (isProv()) {
@@ -1733,6 +1759,7 @@ async function muatAnomali() {
     return;
   }
   state.anomaliRows = rows || [];
+  state.daftarKecAktif = await muatKecamatanKab(kabId);
   renderAnomaliSorted();
 }
 
@@ -1742,9 +1769,11 @@ async function muatAnomali() {
 // (Jan=1 s.d. Des=12), bukan alfabetis (Agu, Apr, Des, Feb, ...).
 const KOLOM_ANOMALI_SORTABLE = [
   { key: "no_urut", label: "No", tipe: "angka" },
-  { key: "bulan", label: "Bulan", tipe: "angka" },
+  { key: "kecamatan", label: "Kecamatan", tipe: "teks" },
   { key: "nama_komoditi", label: "Nama Komoditi", tipe: "teks" },
+  { key: "bulan", label: "Bulan", tipe: "angka" },
   { key: "kalimat_anomali", label: "Anomali", tipe: "teks" },
+  { key: "tindak_lanjut", label: "Tindak Lanjut", tipe: "teks" },
   { key: "konfirmasi_kabkot", label: null, tipe: "teks" }, // label kolom ini dinamis (nama kab), lihat renderAnomali
   { key: "approval_provinsi", label: "Approval Provinsi", tipe: "teks" },
 ];
@@ -1790,24 +1819,32 @@ function nilaiKolomDariBarisAnomali(tr, kolom) {
       const txt = (tds[0 + offset]?.textContent || "").trim();
       return txt === "" ? null : Number(txt);
     }
-    case "bulan": {
+    case "kecamatan": {
       const input = tds[1 + offset]?.querySelector(".combo-input");
-      const txt = (input ? input.value : tds[1 + offset]?.textContent || "").trim();
-      const jenisAktif = $("sel-jenis-anomali").value;
-      const idx = daftarPeriodeAnomali(jenisAktif).indexOf(txt);
-      return idx >= 0 ? idx + 1 : null;
+      return (input ? input.value : tds[1 + offset]?.textContent || "").trim();
     }
     case "nama_komoditi": {
       const input = tds[2 + offset]?.querySelector(".combo-input");
       return (input ? input.value : tds[2 + offset]?.textContent || "").trim();
     }
+    case "bulan": {
+      const input = tds[3 + offset]?.querySelector(".combo-input");
+      const txt = (input ? input.value : tds[3 + offset]?.textContent || "").trim();
+      const jenisAktif = $("sel-jenis-anomali").value;
+      const idx = daftarPeriodeAnomali(jenisAktif).indexOf(txt);
+      return idx >= 0 ? idx + 1 : null;
+    }
     case "kalimat_anomali":
-      return (tds[3 + offset]?.textContent || "").trim();
-    case "konfirmasi_kabkot":
       return (tds[4 + offset]?.textContent || "").trim();
-    case "approval_provinsi": {
+    case "tindak_lanjut": {
       const sel = tds[5 + offset]?.querySelector("select");
       return (sel ? sel.value : tds[5 + offset]?.textContent || "").trim();
+    }
+    case "konfirmasi_kabkot":
+      return (tds[6 + offset]?.textContent || "").trim();
+    case "approval_provinsi": {
+      const sel = tds[7 + offset]?.querySelector("select");
+      return (sel ? sel.value : tds[7 + offset]?.textContent || "").trim();
     }
     default:
       return "";
@@ -1855,7 +1892,7 @@ function perbaruiLabelHeaderAnomali() {
   const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
   const labelKab = labelKabAnomaliAktif();
   const jenisAktif = $("sel-jenis-anomali").value;
-  const labelKolom = { no_urut: "No", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  const labelKolom = { no_urut: "No", kecamatan: "Kecamatan", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", tindak_lanjut: "Tindak Lanjut", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
   table.querySelectorAll("thead th.th-sortable").forEach((th) => {
     const key = th.dataset.kolom;
     const panah = kolomAktif === key ? (arahAktif === "asc" ? " ▲" : " ▼") : "";
@@ -2104,6 +2141,131 @@ function buatTdKomoditi(rowId, nilaiSaatIni, editable) {
   return td;
 }
 
+// Combobox Kecamatan -- pola sama persis dgn buatTdKomoditi/buatTdBulan:
+// ketik+cari, dropdown SELALU nempel di bawah input. Daftar kecamatan
+// otomatis mengikuti kabupaten yang sedang aktif di dropdown "sel-kab-anomali"
+// (diambil lewat muatKecamatanKab, lihat pemanggilnya di muatAnomali()).
+function buatTdKecamatan(rowId, nilaiSaatIni, editable, daftarKec) {
+  const td = document.createElement("td");
+
+  if (!editable) {
+    td.classList.add("terkunci");
+    td.textContent = nilaiSaatIni || "";
+    return td;
+  }
+
+  if (!daftarKec || daftarKec.length === 0) {
+    // Fallback: belum ada data kecamatan tersinkron utk kab ini -- pakai
+    // sel bebas ketik biasa.
+    td.contentEditable = "true";
+    td.textContent = nilaiSaatIni || "";
+    td.addEventListener("blur", async () => {
+      await simpanKolomAnomali(rowId, "kecamatan", td.textContent.trim());
+    });
+    return td;
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "combo-wrap";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "combo-input";
+  input.autocomplete = "off";
+  input.placeholder = "Ketik utk cari...";
+  input.value = nilaiSaatIni || "";
+
+  const list = document.createElement("div");
+  list.className = "combo-list hidden";
+
+  let nilaiTersimpan = nilaiSaatIni || "";
+
+  function renderList(filterTeks) {
+    const q = normalisasiNamaTanaman(filterTeks || "");
+    const hasil = q ? daftarKec.filter((n) => normalisasiNamaTanaman(n).includes(q)) : daftarKec;
+    list.innerHTML = hasil.length
+      ? hasil.map((n) => `<div class="combo-option" data-nama="${n.replace(/"/g, "&quot;")}">${n}</div>`).join("")
+      : `<div class="combo-empty">(tidak ada yang cocok)</div>`;
+    list.classList.remove("hidden");
+  }
+
+  async function pilihNama(nama) {
+    input.value = nama;
+    nilaiTersimpan = nama;
+    list.classList.add("hidden");
+    await simpanKolomAnomali(rowId, "kecamatan", nama);
+  }
+
+  input.addEventListener("focus", () => renderList(input.value));
+  input.addEventListener("input", () => renderList(input.value));
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const opsiPertama = list.querySelector(".combo-option");
+      if (opsiPertama) {
+        pilihNama(opsiPertama.dataset.nama);
+      } else {
+        input.value = nilaiTersimpan;
+        list.classList.add("hidden");
+      }
+      input.blur();
+    } else if (e.key === "Escape") {
+      input.value = nilaiTersimpan;
+      list.classList.add("hidden");
+      input.blur();
+    }
+  });
+
+  list.addEventListener("mousedown", (e) => {
+    const opt = e.target.closest(".combo-option");
+    if (!opt) return;
+    e.preventDefault();
+    pilihNama(opt.dataset.nama);
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      list.classList.add("hidden");
+      const ketikan = input.value.trim();
+      if (ketikan === nilaiTersimpan) return;
+      const cocok = daftarKec.find((n) => normalisasiNamaTanaman(n) === normalisasiNamaTanaman(ketikan));
+      if (cocok) {
+        pilihNama(cocok);
+      } else {
+        input.value = nilaiTersimpan;
+      }
+    }, 150);
+  });
+
+  wrap.appendChild(input);
+  wrap.appendChild(list);
+  td.appendChild(wrap);
+  return td;
+}
+
+// Dropdown Tindak Lanjut -- cuma 2 pilihan (Wajar / Perbaikan), jadi
+// cukup <select> native biasa (bukan combobox ketik+cari).
+function buatTdTindakLanjut(rowId, nilaiSaatIni, editable) {
+  const td = document.createElement("td");
+  if (!editable) {
+    td.classList.add("terkunci");
+    td.textContent = nilaiSaatIni === "wajar" ? "Wajar" : nilaiSaatIni === "perbaikan" ? "Perbaikan" : "";
+    return td;
+  }
+  const sel = document.createElement("select");
+  sel.className = "sel-tindak-lanjut";
+  sel.innerHTML = `
+    <option value="" ${!nilaiSaatIni ? "selected" : ""}>— Pilih —</option>
+    <option value="wajar" ${nilaiSaatIni === "wajar" ? "selected" : ""}>Wajar</option>
+    <option value="perbaikan" ${nilaiSaatIni === "perbaikan" ? "selected" : ""}>Perbaikan</option>`;
+  sel.addEventListener("change", async () => {
+    await simpanKolomAnomali(rowId, "tindak_lanjut", sel.value);
+  });
+  td.appendChild(sel);
+  return td;
+}
+
 // Label kabupaten yang sedang aktif di panel Anomali -- dipakai buat
 // judul kolom "Konfirmasi <Nama Kab>" biar otomatis ganti sesuai
 // kabupaten yang dipilih (atau kab_id sendiri kalau role kabkot).
@@ -2128,12 +2290,14 @@ function renderAnomali(rows) {
   tbl.className = "tabel-anomali";
 
   const { kolom: kolomAktif, arah: arahAktif } = state.anomaliSort;
-  const labelKolom = { no_urut: "No", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
+  const labelKolom = { no_urut: "No", kecamatan: "Kecamatan", bulan: labelKolomPeriodeAnomali(jenisAktif), nama_komoditi: "Nama Komoditi", kalimat_anomali: "Anomali", tindak_lanjut: "Tindak Lanjut", konfirmasi_kabkot: `Konfirmasi ${labelKab}`, approval_provinsi: "Approval Provinsi" };
   const clsExtra = {
     no_urut: "col-no",
+    kecamatan: "col-kecamatan",
     bulan: "col-bulan",
     nama_komoditi: "col-komoditi",
     kalimat_anomali: "col-anomali",
+    tindak_lanjut: "col-tindak-lanjut",
     konfirmasi_kabkot: "col-kabkot",
     approval_provinsi: "col-approval",
   };
@@ -2194,13 +2358,21 @@ function renderAnomali(rows) {
     const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov, true);
     tdNo.classList.add("col-no");
 
-    const tdBulan = buatTdBulan(r.id, r.bulan, prov, jenisAktif);
-    tdBulan.classList.add("td-bulan", "col-bulan");
+    const tdKecamatan = buatTdKecamatan(r.id, r.kecamatan ?? "", prov, state.daftarKecAktif);
+    tdKecamatan.classList.add("col-kecamatan");
 
     const tdKomoditi = buatTdKomoditi(r.id, r.nama_komoditi ?? "", prov);
     tdKomoditi.classList.add("col-komoditi");
+
+    const tdBulan = buatTdBulan(r.id, r.bulan, prov, jenisAktif);
+    tdBulan.classList.add("td-bulan", "col-bulan");
+
     const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
     tdKalimat.classList.add("col-anomali");
+
+    const tdTindakLanjut = buatTdTindakLanjut(r.id, r.tindak_lanjut ?? "", prov);
+    tdTindakLanjut.classList.add("col-tindak-lanjut");
+
     const tdKabkot = editableTd(r.konfirmasi_kabkot ?? "", "konfirmasi_kabkot", !prov, false);
     tdKabkot.classList.add("col-kabkot");
 
@@ -2224,9 +2396,11 @@ function renderAnomali(rows) {
     }
 
     tr.appendChild(tdNo);
-    tr.appendChild(tdBulan);
+    tr.appendChild(tdKecamatan);
     tr.appendChild(tdKomoditi);
+    tr.appendChild(tdBulan);
     tr.appendChild(tdKalimat);
+    tr.appendChild(tdTindakLanjut);
     tr.appendChild(tdKabkot);
     tr.appendChild(tdApproval);
 
@@ -2393,7 +2567,7 @@ $("btn-buka-tambah-anomali")?.addEventListener("click", async () => {
       jenis, kab_id: kabId,
       no_urut: noUrutBaru,
       periode_teks: periodeTeks,
-      nama_komoditi: "", kalimat_anomali: "",
+      kecamatan: "", nama_komoditi: "", kalimat_anomali: "", tindak_lanjut: "",
     });
     if (error) throw error;
     // muatAnomali() otomatis balik menampilkan daftar list (bukan
@@ -2536,11 +2710,16 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
             }
           }
         }
+        const tindakRaw = String(row["Tindak Lanjut"] ?? row.tindak_lanjut ?? "").trim().toLowerCase();
+        const tindakVal = tindakRaw === "wajar" ? "wajar" : tindakRaw === "perbaikan" ? "perbaikan" : "";
+
         return {
           jenis, kab_id: kabId,
+          kecamatan: String(row["Kecamatan"] ?? row.kecamatan ?? "").trim(),
           bulan: bulanVal,
           nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
           kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
+          tindak_lanjut: tindakVal,
         };
       }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
 
@@ -2606,27 +2785,29 @@ $("btn-download-anomali-kabkot")?.addEventListener("click", downloadAnomaliExcel
 // file ini utk mengisi "Konfirmasi Kabkot" (lihat uploadKonfirmasiKabkot()).
 // JANGAN diubah/dihapus user, dan JANGAN dipakai utk baris baru yang
 // ditambah manual di Excel (baris tanpa ID otomatis dilewati saat upload).
-const ANOMALI_HEADERS = ["ID", "No", "Kabupaten/Kota", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Konfirmasi Kabkot", "Approval Provinsi"];
-const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 22 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
+const ANOMALI_HEADERS = ["ID", "No", "Kabupaten/Kota", "Kecamatan", "Bulan", "Nama Komoditi", "Kalimat Anomali", "Tindak Lanjut", "Konfirmasi Kabkot", "Approval Provinsi"];
+const ANOMALI_COL_WIDTHS = [{ wch: 8 }, { wch: 6 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 24 }, { wch: 40 }, { wch: 14 }, { wch: 30 }, { wch: 16 }];
 
 // Helper: tulis 1 sheet Anomali dari array rows (dipakai baik utk
 // download per-kab-semua-SPH maupun backup-semua-data-global).
 function tulisSheetAnomaliDariRows(wb, sheetName, rows, jenis) {
   const ws = {};
   const headers = [...ANOMALI_HEADERS];
-  headers[3] = labelKolomPeriodeAnomali(jenis); // "Bulan" (SBS) atau "Triwulan" (BST/TBF/TH)
+  headers[4] = labelKolomPeriodeAnomali(jenis); // "Bulan" (SBS) atau "Triwulan" (BST/TBF/TH)
   const range = { s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } };
   const setCell = (r, c, cell) => { ws[XLSX.utils.encode_cell({ r, c })] = cell; };
 
   headers.forEach((h, c) => setCell(0, c, xlCell(h, { bold: true, bgColor: XL_HIJAU_HEADER, color: XL_PUTIH, align: "left" })));
   const daftarPeriode = daftarPeriodeAnomali(jenis);
+  const labelTindak = (v) => (v === "wajar" ? "Wajar" : v === "perbaikan" ? "Perbaikan" : "");
   rows.forEach((r, i) => {
     const stripeBg = i % 2 === 1 ? XL_ABU_STRIPE : undefined;
     const bulanLabel = r.bulan ? (daftarPeriode[r.bulan - 1] || r.bulan) : "";
     const kabEntryRow = DAFTAR_KAB_BABEL.find((k) => k.id === r.kab_id);
     const labelKabRow = kabEntryRow ? kabEntryRow.nama : (r.kab_id || "");
     const vals = [
-      r.id, r.no_urut, labelKabRow, bulanLabel, r.nama_komoditi, r.kalimat_anomali, r.konfirmasi_kabkot,
+      r.id, r.no_urut, labelKabRow, r.kecamatan || "", bulanLabel, r.nama_komoditi, r.kalimat_anomali,
+      labelTindak(r.tindak_lanjut), r.konfirmasi_kabkot,
       r.approval_provinsi === "ya" ? "Ya" : r.approval_provinsi === "tidak" ? "Tidak" : "",
     ];
     vals.forEach((v, c) => setCell(i + 1, c, xlCell(v, { align: c <= 1 ? "center" : "left", bgColor: stripeBg })));

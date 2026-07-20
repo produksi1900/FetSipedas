@@ -556,19 +556,26 @@ table.tabel-anomali td.col-hapus, table.tabel-anomali th.col-hapus {
    ngepas (bukan persen), Anomali & Konfirmasi Kab/Kot dilebarkan (paling
    penting utk dibaca/ditulis), Approval Provinsi dikunci ngepas +
    center. */
+table.tabel-anomali td.col-kecamatan, table.tabel-anomali th.col-kecamatan {
+  width: 130px; min-width: 110px;
+}
 table.tabel-anomali td.col-komoditi, table.tabel-anomali th.col-komoditi {
-  width: 170px; min-width: 150px;
+  width: 140px; min-width: 120px;
 }
 table.tabel-anomali td.col-anomali, table.tabel-anomali th.col-anomali {
-  min-width: 260px; width: 34%;
+  min-width: 260px; width: 30%;
+}
+table.tabel-anomali td.col-tindak-lanjut, table.tabel-anomali th.col-tindak-lanjut {
+  width: 110px; min-width: 100px; text-align: center;
 }
 table.tabel-anomali td.col-kabkot, table.tabel-anomali th.col-kabkot {
-  min-width: 220px; width: 30%;
+  min-width: 220px; width: 28%;
 }
 table.tabel-anomali td.col-approval, table.tabel-anomali th.col-approval {
-  width: 120px; min-width: 110px; text-align: center;
+  width: 110px; min-width: 100px; text-align: center;
 }
-table.tabel-anomali select.sel-approval {
+table.tabel-anomali select.sel-approval,
+table.tabel-anomali select.sel-tindak-lanjut {
   width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
 }
 table.tabel-anomali select.sel-approval.approval-ya { background: #eafaf1; color: var(--hijau-tua); font-weight: bold; }
