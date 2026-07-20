@@ -61,6 +61,43 @@ async function fetchAllRows(queryFn) {
 // ============================================================
 const $ = (id) => document.getElementById(id);
 
+// ============================================================
+// Loading donut (menggantikan teks "⏳ Memuat data...") — donut
+// muter dengan persentase perkiraan di tengah. Persentase ini BUKAN
+// progress asli (kita tidak tahu progress request ke Supabase), cuma
+// perkiraan yang naik cepat di awal lalu melambat mendekati 90%
+// (sengaja tidak pernah nyampe 100% karena belum tentu selesai) --
+// begitu data beneran datang, konten area diganti (innerHTML lain)
+// dan timer otomatis berhenti sendiri begitu elemen svg-nya sudah
+// tidak ada lagi di DOM.
+function mulaiLoadingDonut(container, teks) {
+  const id = "donut-" + Math.random().toString(36).slice(2);
+  const circumference = 2 * Math.PI * 26;
+  container.innerHTML = `
+    <div class="loading-donut-wrap">
+      <svg class="loading-donut" viewBox="0 0 64 64">
+        <circle class="donut-bg" cx="32" cy="32" r="26"></circle>
+        <circle class="donut-fg" id="${id}-circle" cx="32" cy="32" r="26"
+          stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}"></circle>
+      </svg>
+      <div class="loading-donut-pct" id="${id}-pct">0%</div>
+      ${teks ? `<div class="loading-donut-teks">${teks}</div>` : ""}
+    </div>`;
+
+  let pct = 0;
+  const timer = setInterval(() => {
+    const circle = document.getElementById(`${id}-circle`);
+    const pctEl = document.getElementById(`${id}-pct`);
+    if (!circle || !pctEl) { clearInterval(timer); return; }
+    const sisa = 90 - pct;
+    pct += Math.max(0.4, sisa * 0.09);
+    if (pct > 90) pct = 90;
+    circle.style.strokeDashoffset = String(circumference * (1 - pct / 100));
+    pctEl.textContent = Math.round(pct) + "%";
+  }, 120);
+  return timer;
+}
+
 function isiPilihanTahun(select, { withPilihSemua = false } = {}) {
   select.innerHTML = "";
   if (withPilihSemua) {
@@ -780,7 +817,7 @@ async function muatData() {
     return;
   }
 
-  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
+  mulaiLoadingDonut(area);
 
   // Data kabupaten terpilih (utk tabel utama & grafik per kecamatan)
   let rowsKab;
@@ -1143,7 +1180,7 @@ async function muatRangkuman() {
     return;
   }
 
-  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
+  mulaiLoadingDonut(area);
 
   const ambilTahun = (thn) =>
     fetchAllRows((from, to) => {
@@ -1797,7 +1834,7 @@ async function muatAnomali() {
   const area = $("anomali-area");
   if (!kabId) return;
 
-  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data...</div>`;
+  mulaiLoadingDonut(area);
 
   let rows;
   try {
@@ -3078,7 +3115,7 @@ $("btn-buka-dashboard-anomali-kabkot")?.addEventListener("click", toggleDashboar
 
 async function bukaDashboardAnomali() {
   const area = $("anomali-area");
-  area.innerHTML = `<div class="placeholder-kosong">⏳ Memuat data dashboard...</div>`;
+  mulaiLoadingDonut(area, "Memuat data dashboard...");
 
   // Provinsi: lihat semua kab. Kabkot: cuma kabupatennya sendiri.
   const kabList = isProv() ? KAB_ANOMALI_LIST : [state.profile.kab_id];

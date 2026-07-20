@@ -555,7 +555,9 @@ table.tabel-anomali td.terkunci {
 }
 
 table.tabel-anomali td.col-hapus, table.tabel-anomali th.col-hapus {
-  width: 24px; min-width: 24px;
+  width: 36px; min-width: 36px; max-width: 36px;
+  padding: 4px 2px;
+  text-align: center; vertical-align: middle;
 }
 /* Lebar kolom dikunci pakai CLASS (bukan nth-child) supaya tidak
    bergeser/salah sasaran waktu kolom checkbox (khusus role Provinsi)
@@ -595,10 +597,10 @@ table.tabel-anomali select.sel-tindak-lanjut {
 table.tabel-anomali select.sel-approval.approval-ya { background: #eafaf1; color: var(--hijau-tua); font-weight: bold; }
 table.tabel-anomali select.sel-approval.approval-tidak { background: #fdecea; color: var(--merah); font-weight: bold; }
 
-td.col-hapus { text-align: center; vertical-align: middle; width: 34px; }
 .btn-hapus-baris {
   border: none; background: transparent; color: var(--merah); cursor: pointer; font-size: 16px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
+  margin: 0 auto;
   width: 24px; height: 24px; padding: 0; border-radius: 4px;
 }
 .btn-hapus-baris:hover { background: #fdecea; opacity: 1; }
@@ -719,6 +721,34 @@ table.tabel-dashboard-anomali tr.baris-total-dashboard td {
    #anomali-area -- makanya header kolom malah hilang pas discroll,
    bukannya freeze di atas. Scroll horizontal utk tabel lebar ini
    sekarang ditangani #anomali-area langsung (lihat aturan di atas). */
+/* ---------- Loading Donut (ganti teks "⏳ Memuat data...") ---------- */
+.loading-donut-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 46px 0; color: #999;
+}
+.loading-donut {
+  width: 64px; height: 64px;
+  transform: rotate(-90deg);
+}
+.loading-donut .donut-bg {
+  fill: none; stroke: var(--abu2); stroke-width: 8;
+}
+.loading-donut .donut-fg {
+  fill: none; stroke: var(--hijau-muda); stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .15s linear;
+}
+.loading-donut-pct {
+  position: relative;
+  margin-top: -46px;
+  font-size: 13px; font-weight: bold; color: var(--hijau-tua);
+  width: 64px; height: 64px;
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-donut-teks {
+  font-size: 13px; color: #999; font-style: italic;
+}
+
 .dashboard-anomali-scroll {
   border: 1px solid #e0e0e0; border-radius: 6px;
   /* inline-block + min-width:100% -- kotak ini otomatis melebar
