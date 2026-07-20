@@ -1708,11 +1708,13 @@ async function muatKecamatanKab(kabId) {
       semua = semua.concat(rows || []);
     } catch (e) { /* tabel/kab ini mungkin belum ada data -- lewati */ }
   }
-  const map = new Map();
+  const map = new Map(); // key = nama dinormalisasi (lowercase) -> {nama asli, urutan}
   for (const r of semua) {
-    if (r.nama_kec && !map.has(r.nama_kec)) map.set(r.nama_kec, r.urutkec ?? 0);
+    if (!r.nama_kec) continue;
+    const key = normalisasiNamaTanaman(r.nama_kec);
+    if (!map.has(key)) map.set(key, { nama: r.nama_kec, urutan: r.urutkec ?? 0 });
   }
-  const list = Array.from(map.entries()).sort((a, b) => a[1] - b[1]).map(([nama]) => nama);
+  const list = Array.from(map.values()).sort((a, b) => a.urutan - b.urutan).map((x) => x.nama);
   state.kecamatanPerKab[kabId] = list;
   return list;
 }

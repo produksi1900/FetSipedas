@@ -519,7 +519,7 @@ table.tabel-anomali td {
   overflow-wrap: anywhere;
 }
 table.tabel-anomali { table-layout: fixed; }
-table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; }
+table.tabel-anomali th { background-color: var(--hijau-muda); color: var(--putih); position: sticky; top: 0; z-index: 3; font-size: 12px; }
 table.tabel-anomali th.th-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 table.tabel-anomali th.th-sortable:hover { background-color: var(--hijau-tua); }
 table.tabel-anomali td.col-no, table.tabel-anomali th.col-no {
