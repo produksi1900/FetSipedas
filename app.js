@@ -2044,6 +2044,7 @@ function buatTdBulan(rowId, bulanSaatIni, editable, jenis) {
   input.type = "text";
   input.className = "combo-input";
   input.autocomplete = "off";
+  input.spellcheck = false;
   input.placeholder = jenis === "sbs" ? "Cari bulan..." : "Cari triwulan...";
   input.value = labelSaatIni;
 
@@ -2075,7 +2076,7 @@ function buatTdBulan(rowId, bulanSaatIni, editable, jenis) {
     await simpanKolomAnomali(rowId, "bulan", nomor || null);
   }
 
-  input.addEventListener("focus", () => renderList(input.value));
+  input.addEventListener("focus", () => { renderList(""); input.select(); });
   input.addEventListener("input", () => renderList(input.value));
 
   input.addEventListener("keydown", (e) => {
@@ -2159,6 +2160,7 @@ function buatTdKomoditi(rowId, nilaiSaatIni, editable) {
   wrap.className = "combo-wrap";
 
   const input = document.createElement("textarea");
+  input.spellcheck = false;
   input.rows = 1;
   input.className = "combo-input-wrap";
   input.autocomplete = "off";
@@ -2194,7 +2196,7 @@ function buatTdKomoditi(rowId, nilaiSaatIni, editable) {
     await simpanKolomAnomali(rowId, "nama_komoditi", nama);
   }
 
-  input.addEventListener("focus", () => renderList(input.value));
+  input.addEventListener("focus", () => { renderList(""); input.select(); });
   input.addEventListener("input", () => renderList(input.value));
 
   input.addEventListener("keydown", (e) => {
@@ -2278,6 +2280,7 @@ function buatTdKecamatan(rowId, nilaiSaatIni, editable, daftarKec) {
   wrap.className = "combo-wrap";
 
   const input = document.createElement("textarea");
+  input.spellcheck = false;
   input.rows = 1;
   input.className = "combo-input-wrap";
   input.autocomplete = "off";
@@ -2307,7 +2310,7 @@ function buatTdKecamatan(rowId, nilaiSaatIni, editable, daftarKec) {
     await simpanKolomAnomali(rowId, "kecamatan", nama);
   }
 
-  input.addEventListener("focus", () => renderList(input.value));
+  input.addEventListener("focus", () => { renderList(""); input.select(); });
   input.addEventListener("input", () => renderList(input.value));
 
   input.addEventListener("keydown", (e) => {
