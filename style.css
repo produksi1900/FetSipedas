@@ -605,6 +605,7 @@ table.tabel-anomali th.col-approval {
 table.tabel-anomali select.sel-approval,
 table.tabel-anomali select.sel-tindak-lanjut {
   width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
+  font-family: inherit; /* biar sama dgn font kolom isian lain, bukan font default browser */
 }
 table.tabel-anomali select.sel-approval.approval-ya { background: #eafaf1; color: var(--hijau-tua); font-weight: bold; }
 table.tabel-anomali select.sel-approval.approval-tidak { background: #fdecea; color: var(--merah); font-weight: bold; }
@@ -626,6 +627,7 @@ table.tabel-anomali select.sel-approval.approval-tidak { background: #fdecea; co
 .combo-input {
   width: 100%; padding: 4px 6px; font-size: 12px;
   border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+  font-family: inherit; /* biar sama dgn font kolom lain (Anomali/Kecamatan/Komoditi), bukan font default browser */
 }
 .combo-input:focus { outline: 2px solid var(--hijau-muda); outline-offset: -1px; }
 /* Versi combo-input yang boleh wrap ke bawah (Kecamatan & Nama Komoditi) --
