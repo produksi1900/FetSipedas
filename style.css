@@ -152,6 +152,11 @@ body { display: flex; flex-direction: column; }
 .btn-login.btn-bahaya:hover { background: #96261b; }
 .btn-login.btn-batal { background: var(--abu2); color: #555; }
 .btn-login.btn-batal:hover { background: #dadfda; }
+/* Tombol "Dashboard Anomali" berubah jadi "← Kembali ke Daftar Anomali"
+   (warna oren) saat sedang menampilkan Dashboard -- supaya jelas ini
+   tombol TOGGLE yang sama, bukan 2 tombol terpisah. */
+.btn-login.btn-oranye { background: #e67e22; }
+.btn-login.btn-oranye:hover { background: #c76614; }
 
 /* ---------- Layout utama: full-height, panel kanan full width ---------- */
 .app-shell { display: flex; flex: 1; min-height: 0; }
@@ -616,6 +621,13 @@ td.col-hapus { text-align: center; width: 34px; }
   max-height: 220px; overflow-y: auto;
   z-index: 50;
   box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+/* Dropdown Bulan/Triwulan: isinya cuma teks pendek ("Jan", "Tw2", dst),
+   jadi cukup ngepas ikut lebar isinya saja -- tidak perlu selebar
+   dropdown Kecamatan/Komoditi di atas. */
+.combo-list.combo-list-sempit {
+  min-width: 70px;
+  max-width: 120px;
 }
 .combo-option {
   padding: 6px 8px; font-size: 13px; cursor: pointer; text-align: left;

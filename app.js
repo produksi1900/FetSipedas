@@ -1790,6 +1790,8 @@ function siapkanSlicerAnomali() {
 
 async function muatAnomali() {
   if (!state.profile) return;
+  state.dashboardAnomaliAktif = false;
+  perbaruiTombolDashboardAnomali();
   const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
   const area = $("anomali-area");
@@ -2001,7 +2003,11 @@ function buatTdBulan(rowId, bulanSaatIni, editable, jenis) {
   input.value = labelSaatIni;
 
   const list = document.createElement("div");
-  list.className = "combo-list hidden";
+  // Dropdown Bulan/Triwulan isinya cuma teks pendek (mis. "Jan", "Tw2"),
+  // jadi TIDAK perlu selebar dropdown Kecamatan/Komoditi -- dikasih
+  // class "combo-list-sempit" supaya ngepas ikut isinya saja (lihat
+  // style.css: .combo-list-sempit override min-width/max-width).
+  list.className = "combo-list combo-list-sempit hidden";
 
   let labelTersimpan = labelSaatIni;
 
@@ -3048,8 +3054,27 @@ async function downloadBackupSemuaAnomali() {
 // ============================================================
 const JENIS_LIST_DASHBOARD = ["sbs", "bst", "tbf", "th"];
 
-$("btn-buka-dashboard-anomali")?.addEventListener("click", bukaDashboardAnomali);
-$("btn-buka-dashboard-anomali-kabkot")?.addEventListener("click", bukaDashboardAnomali);
+// Tombol "Dashboard Anomali" & "Kembali ke Daftar Anomali" sekarang jadi
+// SATU tombol yang sama (bukan tombol terpisah lagi) -- teks & warnanya
+// berubah tergantung lagi di tampilan mana (list biasa vs dashboard).
+function perbaruiTombolDashboardAnomali() {
+  const aktif = !!state.dashboardAnomaliAktif;
+  document.querySelectorAll("#btn-buka-dashboard-anomali, #btn-buka-dashboard-anomali-kabkot").forEach((btn) => {
+    btn.textContent = aktif ? "← Kembali ke Daftar Anomali" : "📊 Dashboard Anomali";
+    btn.classList.toggle("btn-oranye", aktif);
+  });
+}
+
+async function toggleDashboardAnomali() {
+  if (state.dashboardAnomaliAktif) {
+    await muatAnomali(); // muatAnomali() sendiri yg reset state & tombol
+  } else {
+    await bukaDashboardAnomali();
+  }
+}
+
+$("btn-buka-dashboard-anomali")?.addEventListener("click", toggleDashboardAnomali);
+$("btn-buka-dashboard-anomali-kabkot")?.addEventListener("click", toggleDashboardAnomali);
 
 async function bukaDashboardAnomali() {
   const area = $("anomali-area");
@@ -3072,6 +3097,8 @@ async function bukaDashboardAnomali() {
     return;
   }
 
+  state.dashboardAnomaliAktif = true;
+  perbaruiTombolDashboardAnomali();
   renderDashboardAnomali(rows, kabList);
 }
 
@@ -3166,12 +3193,10 @@ function renderDashboardAnomali(rows, kabList) {
   const headerDashboard = `
     <div class="dashboard-anomali-header">
       <h3>📊 Dashboard Anomali — Semua Jenis SPH</h3>
-      <button type="button" class="btn-login btn-kecil" id="btn-kembali-dashboard-anomali">← Kembali ke Daftar Anomali</button>
     </div>`;
 
   if (bodyRows === "") {
     area.innerHTML = headerDashboard + `<div class="placeholder-kosong">Belum ada data anomali sama sekali.</div>`;
-    $("btn-kembali-dashboard-anomali").addEventListener("click", muatAnomali);
     return;
   }
 
@@ -3201,8 +3226,6 @@ function renderDashboardAnomali(rows, kabList) {
       </table>
     </div>
   `;
-
-  $("btn-kembali-dashboard-anomali").addEventListener("click", muatAnomali);
 }
 
 // ============================================================
