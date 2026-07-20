@@ -2392,7 +2392,7 @@ function renderAnomali(rows) {
     const tdKalimat = editableTd(r.kalimat_anomali ?? "", "kalimat_anomali", prov, false);
     tdKalimat.classList.add("col-anomali");
 
-    const tdTindakLanjut = buatTdTindakLanjut(r.id, r.tindak_lanjut ?? "", prov);
+    const tdTindakLanjut = buatTdTindakLanjut(r.id, r.tindak_lanjut ?? "", !prov);
     tdTindakLanjut.classList.add("col-tindak-lanjut");
 
     const tdKabkot = editableTd(r.konfirmasi_kabkot ?? "", "konfirmasi_kabkot", !prov, false);
