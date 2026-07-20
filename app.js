@@ -1708,13 +1708,33 @@ async function muatKecamatanKab(kabId) {
       semua = semua.concat(rows || []);
     } catch (e) { /* tabel/kab ini mungkin belum ada data -- lewati */ }
   }
-  const map = new Map(); // key = nama dinormalisasi (lowercase) -> {nama asli, urutan}
+  // PENTING: sumber data kadang menulis nama kecamatan yang SAMA dengan
+  // ejaan beda antar tabel/jenis SPH -- bukan cuma beda kapitalisasi
+  // (mis. "MENDO BARAT" vs "Mendo Barat"), tapi juga beda spasi (mis.
+  // "SUNGAILIAT" vs "Sungai Liat"). Daripada menebak ejaan mana yang
+  // "lebih rapi", ejaan yang dipakai utk ditampilkan adalah ejaan yang
+  // PALING SERING muncul di data asli (paling banyak barisnya di
+  // database) -- jadi benar-benar mengikuti data sebenarnya, bukan
+  // tebakan format.
+  const keyKec = (n) => normalisasiNamaTanaman(n).replace(/\s+/g, "");
+  const grup = new Map(); // key -> { urutan, varian: Map<namaAsli, jumlah> }
   for (const r of semua) {
     if (!r.nama_kec) continue;
-    const key = normalisasiNamaTanaman(r.nama_kec);
-    if (!map.has(key)) map.set(key, { nama: r.nama_kec, urutan: r.urutkec ?? 0 });
+    const key = keyKec(r.nama_kec);
+    if (!grup.has(key)) grup.set(key, { urutan: r.urutkec ?? 0, varian: new Map() });
+    const g = grup.get(key);
+    g.varian.set(r.nama_kec, (g.varian.get(r.nama_kec) || 0) + 1);
   }
-  const list = Array.from(map.values()).sort((a, b) => a.urutan - b.urutan).map((x) => x.nama);
+  const list = Array.from(grup.values())
+    .sort((a, b) => a.urutan - b.urutan)
+    .map((g) => {
+      // Pilih varian ejaan dengan jumlah kemunculan TERBANYAK di data.
+      let namaTerbanyak = null, jumlahTerbanyak = -1;
+      for (const [nama, jumlah] of g.varian.entries()) {
+        if (jumlah > jumlahTerbanyak) { namaTerbanyak = nama; jumlahTerbanyak = jumlah; }
+      }
+      return namaTerbanyak;
+    });
   state.kecamatanPerKab[kabId] = list;
   return list;
 }
