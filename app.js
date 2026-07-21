@@ -206,12 +206,20 @@ async function masukKeApp() {
   state.profile = profile;
 
   // ---- Update UI: header ----
-  // Akun prov "akses_terbatas" (mis. sph1900) sengaja TIDAK menampilkan
-  // nama_tampil-nya di header -- cukup "Provinsi" saja, supaya identitas
-  // akun ini tidak terlalu menonjol dibanding provinsi biasa.
-  const labelUser = profile.akses_terbatas
-    ? "Provinsi"
-    : `${profile.nama_tampil} (${profile.role === "prov" ? "Provinsi" : "Kab/Kota"})`;
+  // Label di pojok kanan header sekarang menunjukkan peran akun secara
+  // eksplisit (bukan nama_tampil bebas lagi):
+  // - prov penuh (mis. sphbps19)      -> "Super Admin Provinsi"
+  // - prov akses_terbatas (mis. sph1900) -> "Admin Provinsi"
+  // - kabkot (mis. sph1971, dst)      -> "Admin <Nama Kabupaten/Kota>"
+  //   (tanpa prefix "Kota"/"Kab." -- mis. "Kota Pangkal Pinang" jadi
+  //   cukup "Admin Pangkal Pinang").
+  let labelUser;
+  if (profile.role === "prov") {
+    labelUser = profile.akses_terbatas ? "Admin Provinsi" : "Super Admin Provinsi";
+  } else {
+    const namaKabBersih = String(profile.kab_id || "").replace(/^Kota\s+/i, "");
+    labelUser = `Admin ${namaKabBersih}`;
+  }
   $("lbl-user").textContent = labelUser;
   $("lbl-user").classList.remove("hidden");
   $("btn-logout").classList.remove("hidden");
