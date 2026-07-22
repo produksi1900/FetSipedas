@@ -1868,6 +1868,10 @@ async function muatAnomali() {
       btnTambah.disabled = modeSemua;
       btnTambah.title = modeSemua ? "Pilih kabupaten spesifik untuk menambah baris" : "";
     }
+    // Upload Excel TIDAK perlu didisable di mode "Semua Kabupaten/Kota"
+    // lagi -- kabupaten sekarang dibaca otomatis dari kolom
+    // "Kabupaten/Kota" di tiap baris file (lihat handler
+    // in-file-anomali), jadi aman diklik di mode manapun.
   }
 
   mulaiLoadingDonut(area);
@@ -1979,13 +1983,15 @@ function renderAnomaliSorted() {
 // diketik/dipilih tapi belum tentu "settle" di cache.
 function nilaiKolomDariBarisAnomali(tr, kolom) {
   const tds = tr.children;
-  // Offset: checkbox (prov full) disisipkan paling awal, lalu kolom
-  // Kabupaten (mode semua) -- keduanya bisa numpuk jadi offset bisa 0/1/2.
   const adaChk = !!tr.querySelector(".chk-anomali");
-  // Kolom Kabupaten (mode semua) ditandai dengan tr.dataset.kabId ada &
-  // td pertama setelah chk tidak punya data-id (bukan td interaktif).
   const adaKabKol = $("sel-kab-anomali")?.value === "semua";
-  const offset = (adaChk ? 1 : 0) + (adaKabKol ? 1 : 0);
+  // Urutan kolom sekarang: [checkbox?] [No] [Kabupaten?] [Kecamatan]
+  // [Komoditi] [Bulan] [Kalimat] [TindakLanjut] [Kabkot] [Approval] --
+  // "No" cuma digeser oleh checkbox (Kabupaten SEKARANG ada SETELAH
+  // No, bukan sebelumnya), sedangkan kolom2 lain (Kecamatan dst)
+  // digeser oleh checkbox DAN kolom Kabupaten.
+  const offsetNo = adaChk ? 1 : 0;
+  const offset = offsetNo + (adaKabKol ? 1 : 0);
 
   // Kolom Kabupaten (hanya mode semua) -- ambil dari dataset tr
   if (kolom === "_kab") {
@@ -1994,35 +2000,35 @@ function nilaiKolomDariBarisAnomali(tr, kolom) {
 
   switch (kolom) {
     case "no_urut": {
-      const txt = (tds[0 + offset]?.textContent || "").trim();
+      const txt = (tds[offsetNo]?.textContent || "").trim();
       return txt === "" ? null : Number(txt);
     }
     case "kecamatan": {
+      const input = tds[0 + offset]?.querySelector(".combo-input, .combo-input-wrap");
+      return (input ? input.value : tds[0 + offset]?.textContent || "").trim();
+    }
+    case "nama_komoditi": {
       const input = tds[1 + offset]?.querySelector(".combo-input, .combo-input-wrap");
       return (input ? input.value : tds[1 + offset]?.textContent || "").trim();
     }
-    case "nama_komoditi": {
-      const input = tds[2 + offset]?.querySelector(".combo-input, .combo-input-wrap");
-      return (input ? input.value : tds[2 + offset]?.textContent || "").trim();
-    }
     case "bulan": {
-      const input = tds[3 + offset]?.querySelector(".combo-input");
-      const txt = (input ? input.value : tds[3 + offset]?.textContent || "").trim();
+      const input = tds[2 + offset]?.querySelector(".combo-input");
+      const txt = (input ? input.value : tds[2 + offset]?.textContent || "").trim();
       const jenisAktif = $("sel-jenis-anomali").value;
       const idx = daftarPeriodeAnomali(jenisAktif).indexOf(txt);
       return idx >= 0 ? idx + 1 : null;
     }
     case "kalimat_anomali":
-      return (tds[4 + offset]?.textContent || "").trim();
+      return (tds[3 + offset]?.textContent || "").trim();
     case "tindak_lanjut": {
-      const sel = tds[5 + offset]?.querySelector("select");
-      return (sel ? sel.value : tds[5 + offset]?.textContent || "").trim();
+      const sel = tds[4 + offset]?.querySelector("select");
+      return (sel ? sel.value : tds[4 + offset]?.textContent || "").trim();
     }
     case "konfirmasi_kabkot":
-      return (tds[6 + offset]?.textContent || "").trim();
+      return (tds[5 + offset]?.textContent || "").trim();
     case "approval_provinsi": {
-      const sel = tds[7 + offset]?.querySelector("select");
-      return (sel ? sel.value : tds[7 + offset]?.textContent || "").trim();
+      const sel = tds[6 + offset]?.querySelector("select");
+      return (sel ? sel.value : tds[6 + offset]?.textContent || "").trim();
     }
     default:
       return "";
@@ -2547,23 +2553,6 @@ function renderAnomali(rows) {
     thChk.appendChild(chkSemua);
     trHead.appendChild(thChk);
   }
-  // Kolom "Kabupaten" ekstra di mode semua (setelah checkbox, sebelum No)
-  if (modeSemua) {
-    const thKab = document.createElement("th");
-    thKab.className = "th-sortable col-kecamatan"; // pakai lebar kecamatan
-    thKab.textContent = "Kabupaten";
-    thKab.dataset.kolom = "_kab";
-    thKab.addEventListener("click", () => {
-      if (state.anomaliSort.kolom === "_kab") {
-        state.anomaliSort.arah = state.anomaliSort.arah === "asc" ? "desc" : "asc";
-      } else {
-        state.anomaliSort = { kolom: "_kab", arah: "asc" };
-      }
-      urutkanBarisAnomaliDiDom(state.anomaliSort.kolom, state.anomaliSort.arah);
-      perbaruiLabelHeaderAnomali();
-    });
-    trHead.appendChild(thKab);
-  }
   KOLOM_ANOMALI_SORTABLE.forEach(({ key, tipe }) => {
     const th = document.createElement("th");
     th.className = "th-sortable" + (clsExtra[key] ? " " + clsExtra[key] : "");
@@ -2588,6 +2577,26 @@ function renderAnomali(rows) {
       perbaruiLabelHeaderAnomali();
     });
     trHead.appendChild(th);
+    // Kolom "Kabupaten" ekstra di mode semua disisipkan TEPAT SETELAH
+    // header "No" (bukan sebelumnya lagi) -- supaya "No" tetap kolom
+    // paling kiri (setelah checkbox kalau ada), baru menyusul nama
+    // Kabupaten, baru Kecamatan dst.
+    if (modeSemua && key === "no_urut") {
+      const thKab = document.createElement("th");
+      thKab.className = "th-sortable col-kecamatan"; // pakai lebar kecamatan
+      thKab.textContent = "Kabupaten";
+      thKab.dataset.kolom = "_kab";
+      thKab.addEventListener("click", () => {
+        if (state.anomaliSort.kolom === "_kab") {
+          state.anomaliSort.arah = state.anomaliSort.arah === "asc" ? "desc" : "asc";
+        } else {
+          state.anomaliSort = { kolom: "_kab", arah: "asc" };
+        }
+        urutkanBarisAnomaliDiDom(state.anomaliSort.kolom, state.anomaliSort.arah);
+        perbaruiLabelHeaderAnomali();
+      });
+      trHead.appendChild(thKab);
+    }
   });
   if (provFull) {
     const thLabel = document.createElement("th");
@@ -2663,13 +2672,15 @@ function renderAnomali(rows) {
       tr.appendChild(buatTdLabelSumber(r.sumber));
     }
 
-    // Kolom Kabupaten (read-only) disisipkan di awal baris di mode semua
+    // Kolom Kabupaten (read-only) disisipkan TEPAT SETELAH sel "No"
+    // (tdNo) -- bukan paling depan lagi -- supaya No tetap kolom paling
+    // kiri (setelah checkbox kalau ada), baru menyusul nama Kabupaten.
     if (modeSemua) {
       const tdKabNama = document.createElement("td");
       tdKabNama.className = "col-kecamatan terkunci";
       const kabE = DAFTAR_KAB_BABEL.find((k) => k.id === r.kab_id);
       tdKabNama.textContent = kabE ? kabE.nama : (r.kab_id || "");
-      tr.insertBefore(tdKabNama, tr.firstChild);
+      tr.insertBefore(tdKabNama, tdNo.nextSibling);
     }
 
     if (provFull) {
@@ -3154,29 +3165,64 @@ $("btn-generate-anomali")?.addEventListener("click", generateAnomaliDariOutlier)
 // (tidak wajib 4 tab lengkap). Jenis SPH tiap baris DITENTUKAN DARI NAMA
 // TAB-nya sendiri, BUKAN dari dropdown "Jenis SPH" yang sedang dipilih
 // di layar -- kolom Periode, No, Nama Komoditi, Kalimat Anomali.
+// Cocokkan label kabupaten (dari kolom "Kabupaten/Kota" di Excel, atau
+// dari nama sheet) balik ke id kabupaten internal (mis. "Kab. Bangka"
+// atau "Bangka" -> "Bangka"). Dipakai supaya Upload Excel bisa membaca
+// kabupaten LANGSUNG DARI ISI FILE -- bukan cuma dari dropdown Wilayah
+// yang sedang aktif di layar -- sehingga file hasil "Download Anomali
+// SPH" baik dari mode 1 kabupaten MAUPUN mode "Semua Kabupaten/Kota"
+// bisa diupload ulang tanpa peduli dropdown sedang di posisi mana.
+function cariKabIdDariLabel(label) {
+  const s = String(label ?? "").trim().toLowerCase();
+  if (!s) return null;
+  const entry = DAFTAR_KAB_BABEL.find(
+    (k) => k.nama.toLowerCase() === s || k.id.toLowerCase() === s
+  );
+  return entry ? entry.id : null;
+}
+
 $("in-file-anomali")?.addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const kabId = $("sel-kab-anomali").value;
+  // kabDropdown dipakai HANYA sebagai fallback -- kalau baris di Excel
+  // tidak punya kolom "Kabupaten/Kota" yang bisa dikenali (mis. file
+  // free-form yang ditulis manual oleh user, bukan hasil Download
+  // Anomali SPH), kabupaten baris itu diambil dari dropdown ini. Kalau
+  // dropdown sedang "semua" DAN baris itu juga tidak punya info
+  // kabupaten, baris itu terpaksa dilewati (dilaporkan di ringkasan).
+  const kabDropdown = $("sel-kab-anomali").value;
 
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
 
-    const daftarPerJenis = {}; // jenis -> array baris siap insert (no_urut belum diisi)
+    // key `${jenis}|${kabId}` -> array baris siap insert (no_urut belum diisi)
+    const grupBaris = new Map();
     const sheetTakDikenali = [];
+    let dilewatiTanpaKab = 0;
 
     for (const sheetName of wb.SheetNames) {
       const kunci = sheetName.trim().toLowerCase();
-      const jenis = JENIS_LIST_DASHBOARD.find(
+      let jenis = JENIS_LIST_DASHBOARD.find(
         (j) => SPH_CONFIG[j].label.toLowerCase() === kunci || j === kunci
       );
+      // Nama sheet hasil download mode "Semua Kabupaten/Kota" berformat
+      // "<Label SPH>_<NamaKab>" (mis. "SPH-SBS_Kab.Bangka") -- kalau
+      // tidak cocok persis di atas, coba cocokkan bagian sebelum "_"
+      // saja.
+      if (!jenis) {
+        const prefix = kunci.split("_")[0];
+        jenis = JENIS_LIST_DASHBOARD.find(
+          (j) => SPH_CONFIG[j].label.toLowerCase() === prefix || j === prefix
+        );
+      }
       if (!jenis) { sheetTakDikenali.push(sheetName); continue; }
 
       const rowsSheet = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: "" });
       const jenisAdalahBulan = jenis === "sbs";
       const daftarPeriodeSheet = daftarPeriodeAnomali(jenis);
-      const daftar = rowsSheet.map((row) => {
+
+      for (const row of rowsSheet) {
         // Kolom periode di Excel: "Bulan" utk SPH-SBS, "Triwulan" utk
         // SPH-BST/TBF/TH (fallback ke "Bulan" juga diterima kalau file
         // lama masih pakai nama kolom itu). Bisa berisi angka (1-12 atau
@@ -3210,48 +3256,69 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
         const tindakRaw = String(row["Tindak Lanjut"] ?? row.tindak_lanjut ?? "").trim().toLowerCase();
         const tindakVal = tindakRaw === "wajar" ? "wajar" : tindakRaw === "perbaikan" ? "perbaikan" : "";
 
-        return {
+        const kecamatan = String(row["Kecamatan"] ?? row.kecamatan ?? "").trim();
+        const namaKomoditi = String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim();
+        const kalimatAnomali = String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim();
+        if (!namaKomoditi && !kalimatAnomali) continue; // baris kosong -- lewati
+
+        // Kabupaten baris ini: UTAMAKAN kolom "Kabupaten/Kota" di file
+        // (kalau ada & dikenali) -- ini yang bikin file hasil download
+        // "Semua Kabupaten/Kota" (per baris beda kabupaten) tetap benar
+        // saat diupload ulang, terlepas dropdown Wilayah lagi di posisi
+        // mana. Kalau kolom itu kosong/tidak dikenali, baru fallback ke
+        // dropdown yang sedang dipilih (asalkan bukan "semua").
+        const kabDariKolom = cariKabIdDariLabel(row["Kabupaten/Kota"] ?? row.kabupaten ?? "");
+        const kabId = kabDariKolom || (kabDropdown !== "semua" ? kabDropdown : null);
+        if (!kabId) { dilewatiTanpaKab++; continue; }
+
+        const baris = {
           jenis, kab_id: kabId,
-          kecamatan: String(row["Kecamatan"] ?? row.kecamatan ?? "").trim(),
-          bulan: bulanVal,
-          nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
-          kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
-          tindak_lanjut: tindakVal,
+          kecamatan, bulan: bulanVal, nama_komoditi: namaKomoditi,
+          kalimat_anomali: kalimatAnomali, tindak_lanjut: tindakVal,
           sumber: "M",
         };
-      }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
-
-      if (daftar.length > 0) daftarPerJenis[jenis] = daftar;
+        const key = `${jenis}|${kabId}`;
+        if (!grupBaris.has(key)) grupBaris.set(key, []);
+        grupBaris.get(key).push(baris);
+      }
     }
 
-    const jenisTerisi = Object.keys(daftarPerJenis);
-    if (jenisTerisi.length === 0) {
-      alert(
+    if (grupBaris.size === 0) {
+      let pesan =
         "Tidak ada baris valid utk diupload.\n" +
         "Pastikan nama tab sheet sesuai Jenis SPH (SPH-SBS/SPH-BST/SPH-TBF/SPH-TH, " +
-        "atau singkatannya sbs/bst/tbf/th), dan tiap baris ada isi Nama Komoditi / Kalimat Anomali."
-      );
+        "atau singkatannya sbs/bst/tbf/th), dan tiap baris ada isi Nama Komoditi / Kalimat Anomali.";
+      if (dilewatiTanpaKab > 0) {
+        pesan += `\n\n${dilewatiTanpaKab} baris dilewati karena kabupatennya tidak diketahui ` +
+          `(kolom "Kabupaten/Kota" kosong/tidak dikenali, dan dropdown Wilayah sedang "Semua Kabupaten/Kota"). ` +
+          `Pilih kabupaten spesifik di dropdown Wilayah dulu, atau pastikan kolom "Kabupaten/Kota" terisi benar.`;
+      }
+      alert(pesan);
       return;
     }
 
     // No urut baris baru disambung dari JUMLAH BARIS YANG SUDAH ADA di
     // database utk tiap kombinasi jenis+kab (bukan asal pakai kolom "No"
     // di Excel -- itu rawan bentrok/duplikat sama baris yang sudah ada).
+    // Dikelompokkan per jenis+kab (bukan per jenis saja) karena satu
+    // file sekarang bisa berisi baris dari BEBERAPA kabupaten sekaligus.
     let semuaBaris = [];
     const ringkasan = [];
-    for (const jenis of jenisTerisi) {
+    for (const [key, daftarBaris] of grupBaris.entries()) {
+      const [jenis, kabIdGrup] = key.split("|");
       const rowsSaatIni = await fetchAllRows((from, to) =>
         supabase.from("konfirmasi_anomali").select("id")
-          .eq("jenis", jenis).eq("kab_id", kabId)
+          .eq("jenis", jenis).eq("kab_id", kabIdGrup)
           .range(from, to)
       );
       let noUrut = rowsSaatIni?.length || 0;
-      const daftar = daftarPerJenis[jenis].map((r) => {
+      const daftar = daftarBaris.map((r) => {
         noUrut += 1;
         return { ...r, no_urut: noUrut };
       });
       semuaBaris = semuaBaris.concat(daftar);
-      ringkasan.push(`${SPH_CONFIG[jenis].label}: ${daftar.length} baris`);
+      const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabIdGrup);
+      ringkasan.push(`${SPH_CONFIG[jenis].label} · ${kabEntry ? kabEntry.nama : kabIdGrup}: ${daftar.length} baris`);
     }
 
     const { error } = await supabase.from("konfirmasi_anomali").insert(semuaBaris);
@@ -3260,6 +3327,9 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
     let pesan = `✓ Berhasil menambah ${semuaBaris.length} baris anomali.\n${ringkasan.join("\n")}`;
     if (sheetTakDikenali.length > 0) {
       pesan += `\n\nTab dilewati (nama tidak dikenali sbg Jenis SPH): ${sheetTakDikenali.join(", ")}`;
+    }
+    if (dilewatiTanpaKab > 0) {
+      pesan += `\n\n${dilewatiTanpaKab} baris dilewati karena kabupatennya tidak diketahui.`;
     }
     alert(pesan);
 

@@ -505,6 +505,16 @@ table.tabel-rekon td.outlier-rata { background-color: #fff176 !important; font-w
 .anomali-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .anomali-toolbar .btn-kecil { width: auto; padding: 7px 12px; font-size: 12px; }
 .btn-file-label { cursor: pointer; display: inline-flex; align-items: center; }
+/* Dipakai saat label Upload Excel dinonaktifkan (mis. mode "Semua
+   Kabupaten/Kota" di Konfirmasi Anomali) -- tombolnya tetap <label>,
+   bukan <button>, jadi tidak bisa dikasih atribut disabled beneran;
+   diredupkan + cursor default supaya kelihatan tidak bisa diklik. */
+.btn-file-label.disabled {
+  background: var(--abu-disabled) !important;
+  color: #888 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
 .hidden-file-input { display: none; }
 
 table.tabel-anomali {
