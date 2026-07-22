@@ -3161,6 +3161,13 @@ async function generateAnomaliUntukSatuKab(kabId, tahun, log) {
     for (const r of rows) {
       const nama = r.namatanaman;
       if (!nama) continue;
+      // Baris "(Group)" (mis. "Cabai Besar (Group)", "Jeruk (Group)")
+      // adalah GABUNGAN/rekap dari komoditi lain yang sudah dihitung
+      // sendiri2 -- nilainya bukan data asli per komoditi, jadi dilewati
+      // dari pemindaian outlier (sama seperti di Rangkuman Data, lihat
+      // isNamaGroup()) supaya tidak menghasilkan anomali "palsu" dari
+      // angka gabungan.
+      if (isNamaGroup(nama)) continue;
       if (!perKomoditi.has(nama)) perKomoditi.set(nama, []);
       perKomoditi.get(nama).push(r);
     }
