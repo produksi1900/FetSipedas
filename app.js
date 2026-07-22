@@ -2679,7 +2679,12 @@ function renderAnomali(rows) {
       const tdKabNama = document.createElement("td");
       tdKabNama.className = "col-kecamatan terkunci";
       const kabE = DAFTAR_KAB_BABEL.find((k) => k.id === r.kab_id);
-      tdKabNama.textContent = kabE ? kabE.nama : (r.kab_id || "");
+      // "Kab. " sengaja dibuang dari kolom ini saja (bukan dari
+      // DAFTAR_KAB_BABEL/dropdown Wilayah/dll) -- di tabel yang sudah
+      // punya header "Kabupaten" sendiri, prefix itu jadi berlebihan
+      // & bikin lebih makan tempat, cukup "Kota Pangkal Pinang" atau
+      // "Bangka Tengah" saja.
+      tdKabNama.textContent = kabE ? kabE.nama.replace(/^Kab\.\s+/i, "") : (r.kab_id || "");
       tr.insertBefore(tdKabNama, tdNo.nextSibling);
     }
 
