@@ -19,7 +19,7 @@ const state = {
 
 const TAHUN_AWAL = 2018;
 const TAHUN_SEKARANG = new Date().getFullYear();
-const KAB_ANOMALI_LIST = ["Bangka", "Belitung", "Bangka Barat", "Bangka Tengah", "Bangka Selatan", "Belitung Timur", "Kota Pangkal Pinang"];
+const KAB_ANOMALI_LIST = ["Bangka", "Belitung", "Bangka Barat", "Bangka Selatan", "Bangka Tengah", "Belitung Timur", "Kota Pangkal Pinang"];
 
 // ============================================================
 // PENTING — fetchAllRows()
