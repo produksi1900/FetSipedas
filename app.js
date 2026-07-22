@@ -2044,6 +2044,18 @@ function bandingkanNilaiAnomali(va, vb, tipe, arah) {
     if (nb) return -1;
     return arah === "asc" ? va - vb : vb - va;
   }
+  // Kolom "Kabupaten" (mode Semua): sort mengikuti urutan KODE kabupaten
+  // (1901 Bangka s.d. 1971 Kota Pangkal Pinang, lihat KAB_ANOMALI_LIST),
+  // BUKAN alfabetis -- supaya konsisten dgn urutan default tampilan.
+  if (tipe === "kab") {
+    const ia = KAB_ANOMALI_LIST.indexOf(va);
+    const ib = KAB_ANOMALI_LIST.indexOf(vb);
+    const na = ia === -1, nb = ib === -1;
+    if (na && nb) return 0;
+    if (na) return 1;
+    if (nb) return -1;
+    return arah === "asc" ? ia - ib : ib - ia;
+  }
   const sa = String(va ?? "").toLowerCase();
   const sb = String(vb ?? "").toLowerCase();
   const cmp = sa.localeCompare(sb, "id");
@@ -2064,9 +2076,22 @@ function urutkanBarisAnomaliDiDom(kolom, arah) {
   trs.sort((ta, tb) => {
     const va = nilaiKolomDariBarisAnomali(ta, kolom);
     const vb = nilaiKolomDariBarisAnomali(tb, kolom);
-    return bandingkanNilaiAnomali(va, vb, tipe, arah);
+    return bandingkanNilaiAnomali(va, vb, kolom === "_kab" ? "kab" : tipe, arah);
   });
   trs.forEach((tr) => tbody.appendChild(tr));
+
+  // Mode "Semua Kabupaten/Kota": kolom No selalu jalan urut 1,2,3,...
+  // mengikuti urutan tampil SEKARANG (bukan no_urut asli dari database,
+  // yang direset per kabupaten jadi 1,1,1,...) -- jadi tiap kali baris
+  // dipindah urutannya lewat sort di atas, kolom No ikut dinomori ulang.
+  if ($("sel-kab-anomali")?.value === "semua") {
+    const trsBaru = Array.from(tbody.children);
+    trsBaru.forEach((tr, idx) => {
+      const adaChk = !!tr.querySelector(".chk-anomali");
+      const tdNo = tr.children[adaChk ? 1 : 0];
+      if (tdNo) tdNo.textContent = String(idx + 1);
+    });
+  }
 }
 
 // Update teks header (label + panah ▲▼) sesuai kolom/arah sort aktif,
@@ -2613,13 +2638,17 @@ function renderAnomali(rows) {
   tbl.appendChild(thead);
   const tbody = document.createElement("tbody");
 
-  rows.forEach((r) => {
+  rows.forEach((r, idxBaris) => {
     const tr = document.createElement("tr");
     tr.dataset.id = r.id;
     // Simpan kab_id di row supaya bisa dibaca saat sort kolom Kabupaten
     tr.dataset.kabId = r.kab_id || "";
 
-    const tdNo = editableTd(r.no_urut ?? "", "no_urut", prov && !modeSemua, true);
+    // Mode "Semua Kabupaten/Kota": kolom No ditampilkan jalan terus
+    // 1,2,3,... mengikuti urutan baris yang tampil -- BUKAN no_urut asli
+    // dari database (yang direset per kabupaten jadi 1,1,1,1,...).
+    const nilaiNo = modeSemua ? (idxBaris + 1) : (r.no_urut ?? "");
+    const tdNo = editableTd(nilaiNo, "no_urut", prov && !modeSemua, true);
     tdNo.classList.add("col-no");
 
     const tdKecamatan = buatTdKecamatan(r.id, r.kecamatan ?? "", prov, state.daftarKecAktif);
