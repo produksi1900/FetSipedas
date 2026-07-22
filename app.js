@@ -1853,29 +1853,47 @@ async function muatAnomali() {
   const area = $("anomali-area");
   if (!kabId) return;
 
-  mulaiLoadingDonut(area);
-
   // Mode "semua kabupaten/kota": ambil data dari semua kab sekaligus,
   // urutkan berdasarkan urutan KAB_ANOMALI_LIST (1901/Bangka dulu) lalu no_urut.
   const modeSemua = kabId === "semua";
 
+  // Nonaktifkan tombol "+ Tambah Baris" SEGERA begitu mode "Semua"
+  // dipilih -- jangan tunggu render selesai di renderAnomali()
+  // (sebelumnya tombol ini sempat kelihatan aktif/hijau selama proses
+  // loading masih berjalan, padahal begitu data selesai dimuat langsung
+  // didisable juga -- jadi lebih baik didisable dari awal).
+  if (isProv() && !isProvTerbatas()) {
+    const btnTambah = $("btn-buka-tambah-anomali");
+    if (btnTambah) {
+      btnTambah.disabled = modeSemua;
+      btnTambah.title = modeSemua ? "Pilih kabupaten spesifik untuk menambah baris" : "";
+    }
+  }
+
+  mulaiLoadingDonut(area);
+
   let rows;
   try {
     if (modeSemua) {
-      // Ambil semua kab satu per satu (sesuai urutan KAB_ANOMALI_LIST) lalu gabung
-      let semuaRows = [];
-      for (const kab of KAB_ANOMALI_LIST) {
-        const r = await fetchAllRows((from, to) =>
-          supabase
-            .from("konfirmasi_anomali")
-            .select("*")
-            .eq("jenis", jenis).eq("kab_id", kab)
-            .order("no_urut", { ascending: true })
-            .range(from, to)
-        );
-        semuaRows = semuaRows.concat(r || []);
-      }
-      rows = semuaRows;
+      // Ambil SEMUA kab SEKALIGUS secara paralel (Promise.all) --
+      // sebelumnya diambil satu-satu berurutan (7 kab gantian), yang
+      // bikin loading lama padahal masing2 query-nya sendiri cepat.
+      // Promise.all tetap mengembalikan array sesuai urutan INPUT
+      // (KAB_ANOMALI_LIST), bukan sesuai kab mana yang selesai duluan,
+      // jadi urutan hasil gabungan tetap sama seperti sebelumnya.
+      const hasilPerKab = await Promise.all(
+        KAB_ANOMALI_LIST.map((kab) =>
+          fetchAllRows((from, to) =>
+            supabase
+              .from("konfirmasi_anomali")
+              .select("*")
+              .eq("jenis", jenis).eq("kab_id", kab)
+              .order("no_urut", { ascending: true })
+              .range(from, to)
+          )
+        )
+      );
+      rows = hasilPerKab.flat();
     } else {
       rows = await fetchAllRows((from, to) =>
         supabase
@@ -1893,12 +1911,11 @@ async function muatAnomali() {
   state.anomaliRows = rows || [];
 
   if (modeSemua) {
-    // Gabungkan daftar kecamatan dari semua kab untuk combobox
-    let daftarKecGabung = [];
-    for (const kab of KAB_ANOMALI_LIST) {
-      const kecKab = await muatKecamatanKab(kab);
-      daftarKecGabung = daftarKecGabung.concat(kecKab || []);
-    }
+    // Ambil daftar kecamatan semua kab SEKALIGUS (paralel juga, bukan
+    // berurutan) -- muatKecamatanKab sudah punya cache per kab_id
+    // sendiri, jadi aman dipanggil bareng-bareng.
+    const daftarPerKab = await Promise.all(KAB_ANOMALI_LIST.map((kab) => muatKecamatanKab(kab)));
+    const daftarKecGabung = daftarPerKab.flat();
     // Deduplikasi berdasarkan key (case-insensitive, tanpa spasi)
     const seen = new Set();
     state.daftarKecAktif = daftarKecGabung.filter((n) => {
