@@ -627,6 +627,31 @@ table.tabel-anomali td.col-label, table.tabel-anomali th.col-label {
   width: 24px; height: 24px; padding: 0; border-radius: 4px;
 }
 .btn-hapus-baris:hover { background: #fdecea; opacity: 1; }
+.btn-hapus-baris:disabled { cursor: default; opacity: 0.7; }
+.btn-hapus-baris.loading { background: transparent; }
+
+/* Spinner kecil dipakai di tombol ✕ (hapus 1 baris) & bisa dipakai
+   ulang di tempat lain yang butuh indikator "sedang diproses" versi
+   mini (bukan donut besar) -- muter terus sampai elemennya diganti. */
+.mini-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid var(--abu2);
+  border-top-color: var(--merah);
+  border-radius: 50%;
+  animation: miniSpin .7s linear infinite;
+}
+@keyframes miniSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Baris yang sedang diproses hapus -- diredupkan dikit supaya user
+   tahu baris ini sedang "dalam proses", bukan cuma diam menunggu tanpa
+   kejelasan. */
+table.tabel-anomali tr.baris-sedang-proses td {
+  opacity: 0.55;
+  pointer-events: none;
+}
 
 .status-simpan-anomali {
   font-size: 11px; color: #888; font-style: italic; margin-left: 6px;
@@ -729,6 +754,14 @@ table.tabel-dashboard-anomali tr.grup-abu td.nama {
    kabupaten sebelumnya (mis. kab ganjil ke-1 vs kab ganjil ke-3, dst). */
 table.tabel-dashboard-anomali tr.baris-mulai-kab td {
   border-top: 2px solid var(--hijau-tua);
+}
+/* Baris "Subtotal <Nama Kab>" -- muncul di bawah baris2 SPH milik satu
+   kabupaten (kalau kab itu punya lebih dari 1 jenis SPH terisi), warna
+   agak beda dari baris data biasa & dari baris TOTAL provinsi supaya
+   ada 3 tingkat yang jelas: per-SPH -> subtotal kab -> total provinsi. */
+table.tabel-dashboard-anomali tr.baris-subtotal-kab td {
+  background-color: #dfece5 !important; font-weight: bold;
+  border-top: 1px solid var(--hijau-muda);
 }
 /* Persentase ditaruh SEBIJI baris sama jumlahnya (inline, dlm kurung),
    bukan di baris baru di bawahnya -- lebih hemat tempat & baris jadi

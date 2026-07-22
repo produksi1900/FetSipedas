@@ -2619,6 +2619,19 @@ async function simpanKolomAnomali(id, field, value) {
 }
 
 async function hapusBarisAnomali(id, trEl) {
+  // Kasih indikator loading di tombol ✕ baris ini SENDIRI (bukan area
+  // penuh) -- supaya user yang klik tahu prosesnya sedang jalan, tanpa
+  // mengganggu baris lain yang mungkin lagi diedit.
+  const btnHapus = trEl?.querySelector(".btn-hapus-baris");
+  const chkBaris = trEl?.querySelector(".chk-anomali");
+  if (btnHapus) {
+    btnHapus.disabled = true;
+    btnHapus.classList.add("loading");
+    btnHapus.innerHTML = `<span class="mini-spinner"></span>`;
+  }
+  if (chkBaris) chkBaris.disabled = true;
+  if (trEl) trEl.classList.add("baris-sedang-proses");
+
   try {
     const jenis = $("sel-jenis-anomali").value;
     const kabId = $("sel-kab-anomali").value;
@@ -2645,6 +2658,14 @@ async function hapusBarisAnomali(id, trEl) {
 
     await muatAnomali();
   } catch (e) {
+    // Gagal -- kembalikan tombol ke kondisi semula supaya bisa dicoba lagi
+    if (btnHapus) {
+      btnHapus.disabled = false;
+      btnHapus.classList.remove("loading");
+      btnHapus.innerHTML = "✕";
+    }
+    if (chkBaris) chkBaris.disabled = false;
+    if (trEl) trEl.classList.remove("baris-sedang-proses");
     alert("Gagal menghapus: " + e.message);
   }
 }
@@ -2664,6 +2685,11 @@ async function hapusTerpilihAnomali() {
   const ids = checked.map((c) => Number(c.dataset.id));
   const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
+
+  const btn = $("btn-hapus-terpilih-anomali");
+  const teksAsli = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = `⏳ Menghapus ${ids.length} baris...`;
 
   try {
     const { error } = await supabase.from("konfirmasi_anomali").delete().in("id", ids);
@@ -2686,9 +2712,11 @@ async function hapusTerpilihAnomali() {
       }
     }
 
-    await muatAnomali();
+    await muatAnomali(); // muatAnomali() merender ulang tabel -- tombol otomatis balik ke teks/normal
   } catch (e) {
     alert("Gagal menghapus baris terpilih: " + e.message);
+    btn.disabled = false;
+    btn.textContent = teksAsli;
   }
 }
 
@@ -2768,6 +2796,12 @@ $("modal-hapus-anomali")?.addEventListener("click", (e) => {
 });
 
 async function hapusSemuaAnomali() {
+  const btn = $("btn-konfirmasi-hapus-anomali");
+  const teksAsli = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳ Menghapus semua...";
+  $("btn-backup-lalu-hapus-anomali").disabled = true;
+  $("btn-batal-hapus-anomali").disabled = true;
   try {
     // .not("id","is",null) = filter yang selalu cocok utk SEMUA baris
     // (setiap baris pasti punya id/primary key bukan null) -- dipakai
@@ -2778,6 +2812,11 @@ async function hapusSemuaAnomali() {
     await muatAnomali();
   } catch (e) {
     alert("Gagal menghapus semua data: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = teksAsli;
+    $("btn-backup-lalu-hapus-anomali").disabled = false;
+    $("btn-batal-hapus-anomali").disabled = false;
   }
 }
 
@@ -2807,10 +2846,8 @@ $("btn-backup-lalu-hapus-anomali")?.addEventListener("click", async () => {
 // siapkanSlicerAnomali()).
 // ============================================================
 function bukaModalGenerateAnomali() {
-  const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
   const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
-  $("txt-jenis-generate").textContent = SPH_CONFIG[jenis].label;
   $("txt-kab-generate").textContent = kabEntry ? kabEntry.nama : kabId;
   isiPilihanTahun($("sel-tahun-generate-anomali"));
   $("log-generate-anomali").textContent = "";
@@ -2831,105 +2868,136 @@ $("modal-generate-anomali")?.addEventListener("click", (e) => {
 // baru dgn sumber = "G" (Generated). Baris yang kombinasi
 // kecamatan+komoditi+periode-nya SUDAH ADA (utk jenis+kab ini) dilewati,
 // supaya tombol ini aman diklik berkali-kali tanpa bikin duplikat.
+// Samakan ejaan nama kecamatan ke bentuk KANONIK yang sama dgn yang
+// dipakai combobox manual (lihat muatKecamatanKab) -- supaya baris hasil
+// Generate Anomali TIDAK punya ejaan kecamatan yang beda2 (mis.
+// "MERAWANG" vs "Merawang") dibanding baris yang ditambah manual.
+function keyKecamatan(n) {
+  return normalisasiNamaTanaman(n).replace(/\s+/g, "");
+}
+function cariNamaKecKanonik(namaAsli, daftarKec) {
+  const key = keyKecamatan(namaAsli);
+  const cocok = (daftarKec || []).find((n) => keyKecamatan(n) === key);
+  return cocok || namaAsli;
+}
+
 async function generateAnomaliDariOutlier() {
-  const jenis = $("sel-jenis-anomali").value;
   const kabId = $("sel-kab-anomali").value;
   const tahun = Number($("sel-tahun-generate-anomali").value);
-  const cfg = SPH_CONFIG[jenis];
-  const tabUtama = cfg.tabs.find((t) => !t.single) || cfg.tabs[0];
   const btn = $("btn-generate-anomali");
   const log = $("log-generate-anomali");
 
   btn.disabled = true;
   btn.textContent = "⏳ Memproses...";
-  log.textContent = "Mengambil data...";
+
+  // Daftar ejaan kanonik kecamatan utk kabupaten ini -- SAMA persis dgn
+  // yang dipakai combobox Kecamatan di baris manual (dipakai bareng utk
+  // semua jenis SPH, karena data kecamatan sama utk 1 kabupaten).
+  const daftarKecKanonik = await muatKecamatanKab(kabId);
+
+  const ringkasan = [];
+  let totalDitambah = 0;
 
   try {
-    const rows = await fetchAllRows((from, to) =>
-      supabase.from(cfg.table).select("*").eq("tahun", tahun).eq("nama_kab", kabId).range(from, to)
-    );
-    if (!rows || rows.length === 0) {
-      log.textContent = `Tidak ada data ${cfg.label} tahun ${tahun} untuk kabupaten ini.`;
-      return;
-    }
+    for (const jenis of JENIS_LIST_DASHBOARD) {
+      log.textContent = `Memindai ${SPH_CONFIG[jenis].label}...`;
 
-    log.textContent = "Menghitung outlier & mengecek duplikat...";
+      const cfg = SPH_CONFIG[jenis];
+      const tabUtama = cfg.tabs.find((t) => !t.single) || cfg.tabs[0];
 
-    const existing = await fetchAllRows((from, to) =>
-      supabase.from("konfirmasi_anomali").select("kecamatan, nama_komoditi, bulan")
-        .eq("jenis", jenis).eq("kab_id", kabId).range(from, to)
-    );
-    const existSet = new Set(
-      (existing || []).map((e) => `${normalisasiNamaTanaman(e.kecamatan)}|${normalisasiNamaTanaman(e.nama_komoditi)}|${e.bulan}`)
-    );
-    let noUrut = existing?.length || 0;
-
-    // Kelompokkan baris per komoditi
-    const perKomoditi = new Map();
-    for (const r of rows) {
-      const nama = r.namatanaman;
-      if (!nama) continue;
-      if (!perKomoditi.has(nama)) perKomoditi.set(nama, []);
-      perKomoditi.get(nama).push(r);
-    }
-
-    const periodeCol = cfg.periodeCol;
-    const barisBaru = [];
-
-    for (const [komoditi, rowsKom] of perKomoditi.entries()) {
-      const matrix = new Map();      // "kec|periode" -> nilai
-      const kecInfo = new Map();     // kode kec -> nama_kec
-      for (const r of rowsKom) {
-        const per = Number(r[periodeCol]);
-        matrix.set(`${r.kec}|${per}`, nilaiFromRow(r, tabUtama));
-        if (!kecInfo.has(r.kec)) kecInfo.set(r.kec, r.nama_kec);
+      const rows = await fetchAllRows((from, to) =>
+        supabase.from(cfg.table).select("*").eq("tahun", tahun).eq("nama_kab", kabId).range(from, to)
+      );
+      if (!rows || rows.length === 0) {
+        ringkasan.push(`${cfg.label}: tidak ada data`);
+        continue;
       }
 
-      const [lo, hi] = iqrBounds(Array.from(matrix.values()));
-      if (lo === null) continue; // data kurang dari 4 nilai valid -- tidak bisa hitung IQR
+      const existing = await fetchAllRows((from, to) =>
+        supabase.from("konfirmasi_anomali").select("kecamatan, nama_komoditi, bulan")
+          .eq("jenis", jenis).eq("kab_id", kabId).range(from, to)
+      );
+      const existSet = new Set(
+        (existing || []).map((e) => `${normalisasiNamaTanaman(e.kecamatan)}|${normalisasiNamaTanaman(e.nama_komoditi)}|${e.bulan}`)
+      );
+      let noUrut = existing?.length || 0;
 
-      for (const [key, v] of matrix.entries()) {
-        if (!isOutlier(v, lo, hi)) continue;
-        const [kecKode, perStr] = key.split("|");
-        const per = Number(perStr);
-        const namaKec = kecInfo.get(kecKode) || kecKode;
-
-        const dupKey = `${normalisasiNamaTanaman(namaKec)}|${normalisasiNamaTanaman(komoditi)}|${per}`;
-        if (existSet.has(dupKey)) continue;
-        existSet.add(dupKey);
-
-        noUrut += 1;
-        const labelPeriode = periodeCol === "triwulan" ? `Tw${per}` : (cfg.periodeLabels[per - 1] || per);
-
-        barisBaru.push({
-          jenis, kab_id: kabId,
-          no_urut: noUrut,
-          periode_teks: `${labelPeriode} ${tahun}`,
-          kecamatan: namaKec,
-          nama_komoditi: komoditi,
-          bulan: per,
-          kalimat_anomali:
-            `Nilai ${tabUtama.label} sebesar ${fmt(v, 2)} ${tabUtama.satuan} terdeteksi di luar ` +
-            `rentang wajar (${fmt(lo, 2)} s.d. ${fmt(hi, 2)} ${tabUtama.satuan}).`,
-          tindak_lanjut: "",
-          sumber: "G",
-        });
+      // Kelompokkan baris per komoditi
+      const perKomoditi = new Map();
+      for (const r of rows) {
+        const nama = r.namatanaman;
+        if (!nama) continue;
+        if (!perKomoditi.has(nama)) perKomoditi.set(nama, []);
+        perKomoditi.get(nama).push(r);
       }
+
+      const periodeCol = cfg.periodeCol;
+      const barisBaru = [];
+
+      for (const [komoditi, rowsKom] of perKomoditi.entries()) {
+        const matrix = new Map();      // "kec|periode" -> nilai
+        const kecInfo = new Map();     // kode kec -> nama_kec
+        for (const r of rowsKom) {
+          const per = Number(r[periodeCol]);
+          matrix.set(`${r.kec}|${per}`, nilaiFromRow(r, tabUtama));
+          if (!kecInfo.has(r.kec)) kecInfo.set(r.kec, r.nama_kec);
+        }
+
+        const [lo, hi] = iqrBounds(Array.from(matrix.values()));
+        if (lo === null) continue; // data kurang dari 4 nilai valid -- tidak bisa hitung IQR
+
+        for (const [key, v] of matrix.entries()) {
+          if (!isOutlier(v, lo, hi)) continue;
+          const [kecKode, perStr] = key.split("|");
+          const per = Number(perStr);
+          const namaKecAsli = kecInfo.get(kecKode) || kecKode;
+          const namaKec = cariNamaKecKanonik(namaKecAsli, daftarKecKanonik);
+
+          const dupKey = `${normalisasiNamaTanaman(namaKec)}|${normalisasiNamaTanaman(komoditi)}|${per}`;
+          if (existSet.has(dupKey)) continue;
+          existSet.add(dupKey);
+
+          noUrut += 1;
+          const labelPeriode = periodeCol === "triwulan" ? `Tw${per}` : (cfg.periodeLabels[per - 1] || per);
+
+          barisBaru.push({
+            jenis, kab_id: kabId,
+            no_urut: noUrut,
+            periode_teks: `${labelPeriode} ${tahun}`,
+            kecamatan: namaKec,
+            nama_komoditi: komoditi,
+            bulan: per,
+            kalimat_anomali:
+              `Nilai ${tabUtama.label} sebesar ${fmt(v, 2)} ${tabUtama.satuan} terdeteksi di luar ` +
+              `rentang wajar (${fmt(lo, 2)} s.d. ${fmt(hi, 2)} ${tabUtama.satuan}).`,
+            tindak_lanjut: "",
+            sumber: "G",
+          });
+        }
+      }
+
+      if (barisBaru.length === 0) {
+        ringkasan.push(`${cfg.label}: tidak ada outlier baru`);
+        continue;
+      }
+
+      const { error } = await supabase.from("konfirmasi_anomali").insert(barisBaru);
+      if (error) throw new Error(`${cfg.label}: ${error.message}`);
+
+      totalDitambah += barisBaru.length;
+      ringkasan.push(`${cfg.label}: ${barisBaru.length} baris baru`);
     }
 
-    if (barisBaru.length === 0) {
-      log.textContent = "Tidak ada outlier baru yang ditemukan (semua sudah ada / data belum cukup).";
-      return;
+    log.textContent = totalDitambah > 0
+      ? `✓ Selesai! ${totalDitambah} baris anomali ditambahkan.\n${ringkasan.join("\n")}`
+      : `Tidak ada outlier baru yang ditemukan.\n${ringkasan.join("\n")}`;
+
+    if (totalDitambah > 0) {
+      setTimeout(() => tutupModalGenerateAnomali(), 1200);
+      await muatAnomali(); // refresh tampilan list utk jenis+kab yg sedang aktif di dropdown
     }
-
-    const { error } = await supabase.from("konfirmasi_anomali").insert(barisBaru);
-    if (error) throw error;
-
-    log.textContent = `✓ ${barisBaru.length} baris anomali (outlier) berhasil ditambahkan.`;
-    setTimeout(() => tutupModalGenerateAnomali(), 900);
-    await muatAnomali();
   } catch (e) {
-    log.textContent = `✗ Gagal: ${e.message}`;
+    log.textContent = `✗ Gagal: ${e.message}${ringkasan.length ? "\n" + ringkasan.join("\n") : ""}`;
   } finally {
     btn.disabled = false;
     btn.textContent = "⚡ Generate Anomali";
@@ -3381,6 +3449,11 @@ function renderDashboardAnomali(rows, kabList) {
     const clsGrup = grupKeIdx % 2 === 1 ? " grup-abu" : "";
     grupKeIdx++;
 
+    // Akumulator subtotal KHUSUS kabupaten ini (direset tiap ganti kab),
+    // supaya ada baris "Subtotal <Nama Kab>" di bawah baris2 SPH-nya --
+    // sebelumnya cuma ada 1 baris TOTAL provinsi di paling bawah.
+    const subTotalKab = { total: 0, sudahKonfirmasi: 0, belumKonfirmasi: 0, approvalYa: 0, approvalTidak: 0, approvalBelum: 0 };
+
     jenisTerisi.forEach((jenis, idx) => {
       const s = map.get(`${kab}|${jenis}`);
 
@@ -3390,6 +3463,13 @@ function renderDashboardAnomali(rows, kabList) {
       totalRow.approvalYa += s.approvalYa;
       totalRow.approvalTidak += s.approvalTidak;
       totalRow.approvalBelum += s.approvalBelum;
+
+      subTotalKab.total += s.total;
+      subTotalKab.sudahKonfirmasi += s.sudahKonfirmasi;
+      subTotalKab.belumKonfirmasi += s.belumKonfirmasi;
+      subTotalKab.approvalYa += s.approvalYa;
+      subTotalKab.approvalTidak += s.approvalTidak;
+      subTotalKab.approvalBelum += s.approvalBelum;
 
       // Sel Kabupaten cuma dicetak di baris pertama kab ini, dgn
       // rowspan sepanjang jumlah baris SPH yang terisi utk kab tsb
@@ -3415,6 +3495,21 @@ function renderDashboardAnomali(rows, kabList) {
         <td>${s.approvalBelum}</td>
       </tr>`;
     });
+
+    // Baris Subtotal per kabupaten -- cuma ditampilkan kalau kab ini
+    // punya lebih dari 1 jenis SPH terisi (kalau cuma 1 jenis, subtotal
+    // = sama persis dgn baris SPH itu, jadi tidak perlu diulang).
+    if (jenisTerisi.length > 1) {
+      bodyRows += `<tr class="${clsGrup} baris-subtotal-kab">
+        <td colspan="2">Subtotal ${labelKab}</td>
+        <td>${subTotalKab.total}</td>
+        <td>${fmtCountPct(subTotalKab.sudahKonfirmasi, subTotalKab.total)}</td>
+        <td>${subTotalKab.belumKonfirmasi}</td>
+        <td>${subTotalKab.approvalYa}</td>
+        <td>${subTotalKab.approvalTidak}</td>
+        <td>${subTotalKab.approvalBelum}</td>
+      </tr>`;
+    }
   }
 
   const headerDashboard = `
