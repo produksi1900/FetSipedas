@@ -610,6 +610,16 @@ table.tabel-anomali select.sel-tindak-lanjut {
 table.tabel-anomali select.sel-approval.approval-ya { background: #eafaf1; color: var(--hijau-tua); font-weight: bold; }
 table.tabel-anomali select.sel-approval.approval-tidak { background: #fdecea; color: var(--merah); font-weight: bold; }
 
+table.tabel-anomali td.col-label, table.tabel-anomali th.col-label {
+  width: 50px; min-width: 50px; text-align: center; white-space: nowrap;
+}
+.label-sumber {
+  display: inline-block; min-width: 20px; padding: 2px 6px;
+  border-radius: 4px; font-weight: bold; font-size: 11px;
+}
+.label-sumber-g { background: #eafaf1; color: var(--hijau-tua); }
+.label-sumber-m { background: #eef1f4; color: #555; }
+
 .btn-hapus-baris {
   border: none; background: transparent; color: var(--merah); cursor: pointer; font-size: 16px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;

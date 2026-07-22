@@ -1831,6 +1831,7 @@ function siapkanSlicerAnomali() {
   if (isProv()) {
     const terbatas = isProvTerbatas();
     $("btn-buka-tambah-anomali").classList.toggle("hidden", terbatas);
+    $("btn-buka-generate-anomali").classList.toggle("hidden", terbatas);
     $("lbl-upload-anomali").classList.toggle("hidden", terbatas);
     // Akun prov terbatas (mis. sph1900) tidak boleh menghapus baris
     // sama sekali -- baik satu-satu (X per baris, kolom checkboxnya
@@ -2367,6 +2368,19 @@ function buatTdKecamatan(rowId, nilaiSaatIni, editable, daftarKec) {
   return td;
 }
 
+// Kolom Label (G/M) -- G = digenerate otomatis dari deteksi outlier,
+// M = ditambahkan manual (baik lewat "+ Tambah Baris" maupun upload
+// Excel). Read-only, cuma tampil utk provinsi PENUH (provFull), tidak
+// pernah tampil utk sph1900 (prov terbatas) atau kabkot.
+function buatTdLabelSumber(sumber) {
+  const td = document.createElement("td");
+  td.className = "col-label terkunci";
+  const nilai = sumber === "G" ? "G" : "M";
+  const judul = nilai === "G" ? "Generated (otomatis dari outlier)" : "Manual (input langsung)";
+  td.innerHTML = `<span class="label-sumber label-sumber-${nilai.toLowerCase()}" title="${judul}">${nilai}</span>`;
+  return td;
+}
+
 // Dropdown Tindak Lanjut -- cuma 2 pilihan (Wajar / Perbaikan), jadi
 // cukup <select> native biasa (bukan combobox ketik+cari).
 function buatTdTindakLanjut(rowId, nilaiSaatIni, editable) {
@@ -2470,6 +2484,12 @@ function renderAnomali(rows) {
     trHead.appendChild(th);
   });
   if (provFull) {
+    const thLabel = document.createElement("th");
+    thLabel.className = "col-label";
+    thLabel.textContent = "Label";
+    trHead.appendChild(thLabel);
+  }
+  if (provFull) {
     const thHapus = document.createElement("th");
     thHapus.className = "col-hapus";
     trHead.appendChild(thHapus);
@@ -2530,6 +2550,10 @@ function renderAnomali(rows) {
     tr.appendChild(tdTindakLanjut);
     tr.appendChild(tdKabkot);
     tr.appendChild(tdApproval);
+
+    if (provFull) {
+      tr.appendChild(buatTdLabelSumber(r.sumber));
+    }
 
     if (provFull) {
       const tdChk = document.createElement("td");
@@ -2696,6 +2720,7 @@ $("btn-buka-tambah-anomali")?.addEventListener("click", async () => {
       no_urut: noUrutBaru,
       periode_teks: periodeTeks,
       kecamatan: "", nama_komoditi: "", kalimat_anomali: "", tindak_lanjut: "",
+      sumber: "M",
     });
     if (error) throw error;
     // muatAnomali() otomatis balik menampilkan daftar list (bukan
@@ -2776,6 +2801,142 @@ $("btn-backup-lalu-hapus-anomali")?.addEventListener("click", async () => {
   }
 });
 
+// ============================================================
+// GENERATE ANOMALI DARI OUTLIER (khusus prov PENUH / superadmin,
+// misal sphbps19 -- disembunyikan utk sph1900 & kabkot lewat
+// siapkanSlicerAnomali()).
+// ============================================================
+function bukaModalGenerateAnomali() {
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+  const kabEntry = DAFTAR_KAB_BABEL.find((k) => k.id === kabId);
+  $("txt-jenis-generate").textContent = SPH_CONFIG[jenis].label;
+  $("txt-kab-generate").textContent = kabEntry ? kabEntry.nama : kabId;
+  isiPilihanTahun($("sel-tahun-generate-anomali"));
+  $("log-generate-anomali").textContent = "";
+  $("modal-generate-anomali").classList.remove("hidden");
+}
+function tutupModalGenerateAnomali() {
+  $("modal-generate-anomali").classList.add("hidden");
+}
+$("btn-buka-generate-anomali")?.addEventListener("click", bukaModalGenerateAnomali);
+$("btn-tutup-generate-anomali")?.addEventListener("click", tutupModalGenerateAnomali);
+$("modal-generate-anomali")?.addEventListener("click", (e) => {
+  if (e.target.id === "modal-generate-anomali") tutupModalGenerateAnomali();
+});
+
+// Deteksi outlier per komoditi (pakai tab provitas utama -- tab pertama
+// yang bukan tab "harga"/single), persis logic IQR yang dipakai tabel
+// Rekonsiliasi (iqrBounds/isOutlier di atas), lalu insert baris anomali
+// baru dgn sumber = "G" (Generated). Baris yang kombinasi
+// kecamatan+komoditi+periode-nya SUDAH ADA (utk jenis+kab ini) dilewati,
+// supaya tombol ini aman diklik berkali-kali tanpa bikin duplikat.
+async function generateAnomaliDariOutlier() {
+  const jenis = $("sel-jenis-anomali").value;
+  const kabId = $("sel-kab-anomali").value;
+  const tahun = Number($("sel-tahun-generate-anomali").value);
+  const cfg = SPH_CONFIG[jenis];
+  const tabUtama = cfg.tabs.find((t) => !t.single) || cfg.tabs[0];
+  const btn = $("btn-generate-anomali");
+  const log = $("log-generate-anomali");
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Memproses...";
+  log.textContent = "Mengambil data...";
+
+  try {
+    const rows = await fetchAllRows((from, to) =>
+      supabase.from(cfg.table).select("*").eq("tahun", tahun).eq("nama_kab", kabId).range(from, to)
+    );
+    if (!rows || rows.length === 0) {
+      log.textContent = `Tidak ada data ${cfg.label} tahun ${tahun} untuk kabupaten ini.`;
+      return;
+    }
+
+    log.textContent = "Menghitung outlier & mengecek duplikat...";
+
+    const existing = await fetchAllRows((from, to) =>
+      supabase.from("konfirmasi_anomali").select("kecamatan, nama_komoditi, bulan")
+        .eq("jenis", jenis).eq("kab_id", kabId).range(from, to)
+    );
+    const existSet = new Set(
+      (existing || []).map((e) => `${normalisasiNamaTanaman(e.kecamatan)}|${normalisasiNamaTanaman(e.nama_komoditi)}|${e.bulan}`)
+    );
+    let noUrut = existing?.length || 0;
+
+    // Kelompokkan baris per komoditi
+    const perKomoditi = new Map();
+    for (const r of rows) {
+      const nama = r.namatanaman;
+      if (!nama) continue;
+      if (!perKomoditi.has(nama)) perKomoditi.set(nama, []);
+      perKomoditi.get(nama).push(r);
+    }
+
+    const periodeCol = cfg.periodeCol;
+    const barisBaru = [];
+
+    for (const [komoditi, rowsKom] of perKomoditi.entries()) {
+      const matrix = new Map();      // "kec|periode" -> nilai
+      const kecInfo = new Map();     // kode kec -> nama_kec
+      for (const r of rowsKom) {
+        const per = Number(r[periodeCol]);
+        matrix.set(`${r.kec}|${per}`, nilaiFromRow(r, tabUtama));
+        if (!kecInfo.has(r.kec)) kecInfo.set(r.kec, r.nama_kec);
+      }
+
+      const [lo, hi] = iqrBounds(Array.from(matrix.values()));
+      if (lo === null) continue; // data kurang dari 4 nilai valid -- tidak bisa hitung IQR
+
+      for (const [key, v] of matrix.entries()) {
+        if (!isOutlier(v, lo, hi)) continue;
+        const [kecKode, perStr] = key.split("|");
+        const per = Number(perStr);
+        const namaKec = kecInfo.get(kecKode) || kecKode;
+
+        const dupKey = `${normalisasiNamaTanaman(namaKec)}|${normalisasiNamaTanaman(komoditi)}|${per}`;
+        if (existSet.has(dupKey)) continue;
+        existSet.add(dupKey);
+
+        noUrut += 1;
+        const labelPeriode = periodeCol === "triwulan" ? `Tw${per}` : (cfg.periodeLabels[per - 1] || per);
+
+        barisBaru.push({
+          jenis, kab_id: kabId,
+          no_urut: noUrut,
+          periode_teks: `${labelPeriode} ${tahun}`,
+          kecamatan: namaKec,
+          nama_komoditi: komoditi,
+          bulan: per,
+          kalimat_anomali:
+            `Nilai ${tabUtama.label} sebesar ${fmt(v, 2)} ${tabUtama.satuan} terdeteksi di luar ` +
+            `rentang wajar (${fmt(lo, 2)} s.d. ${fmt(hi, 2)} ${tabUtama.satuan}).`,
+          tindak_lanjut: "",
+          sumber: "G",
+        });
+      }
+    }
+
+    if (barisBaru.length === 0) {
+      log.textContent = "Tidak ada outlier baru yang ditemukan (semua sudah ada / data belum cukup).";
+      return;
+    }
+
+    const { error } = await supabase.from("konfirmasi_anomali").insert(barisBaru);
+    if (error) throw error;
+
+    log.textContent = `✓ ${barisBaru.length} baris anomali (outlier) berhasil ditambahkan.`;
+    setTimeout(() => tutupModalGenerateAnomali(), 900);
+    await muatAnomali();
+  } catch (e) {
+    log.textContent = `✗ Gagal: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⚡ Generate Anomali";
+  }
+}
+$("btn-generate-anomali")?.addEventListener("click", generateAnomaliDariOutlier);
+
 // ---- Upload Excel (khusus prov): boleh berisi 1 s.d. 4 tab sheet
 // SEKALIGUS dalam satu file, satu tab per Jenis SPH -- nama tab
 // dicocokkan ke label Jenis SPH ("SPH-SBS"/"SPH-BST"/"SPH-TBF"/"SPH-TH")
@@ -2848,6 +3009,7 @@ $("in-file-anomali")?.addEventListener("change", async (e) => {
           nama_komoditi: String(row["Nama Komoditi"] ?? row.nama_komoditi ?? "").trim(),
           kalimat_anomali: String(row["Kalimat Anomali"] ?? row.kalimat_anomali ?? "").trim(),
           tindak_lanjut: tindakVal,
+          sumber: "M",
         };
       }).filter((r) => r.nama_komoditi || r.kalimat_anomali);
 

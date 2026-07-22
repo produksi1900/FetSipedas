@@ -199,6 +199,7 @@
 
           <div class="anomali-toolbar" id="anomali-toolbar-prov">
             <button class="btn-login btn-kecil" id="btn-buka-tambah-anomali">+ Tambah Baris</button>
+            <button class="btn-login btn-kecil" id="btn-buka-generate-anomali">⚡ Generate Anomali</button>
             <label class="btn-login btn-kecil btn-file-label" for="in-file-anomali" id="lbl-upload-anomali">⬆ Upload Excel</label>
             <input type="file" id="in-file-anomali" accept=".xlsx,.xls" class="hidden-file-input">
             <button class="btn-login btn-kecil" id="btn-download-anomali">⬇ Download Anomali SPH</button>
@@ -230,6 +231,28 @@
               <button class="btn-login" id="btn-backup-lalu-hapus-anomali">⬇ Download Backup Excel, lalu Hapus</button>
               <button class="btn-login btn-bahaya" id="btn-konfirmasi-hapus-anomali">🗑 Hapus Semua (Tanpa Backup)</button>
               <button class="btn-login btn-batal" id="btn-batal-hapus-anomali">Batal</button>
+            </div>
+          </div>
+
+          <!-- ===== POPUP: GENERATE ANOMALI (dari outlier otomatis) ===== -->
+          <div class="modal-overlay hidden" id="modal-generate-anomali">
+            <div class="modal-box">
+              <div class="modal-title">
+                Generate Anomali dari Outlier
+                <button type="button" class="modal-close" id="btn-tutup-generate-anomali">✕</button>
+              </div>
+              <p class="modal-teks">
+                Akan memindai data <strong id="txt-jenis-generate"></strong> — <strong id="txt-kab-generate"></strong>
+                untuk tahun yang dipilih, lalu otomatis menambahkan baris anomali dari nilai provitas yang
+                terdeteksi outlier (nilai kuning di tabel Rekonsiliasi). Baris yang sudah ada (kecamatan +
+                komoditi + periode sama) tidak akan diduplikasi.
+              </p>
+              <div class="field">
+                <label>Tahun</label>
+                <select id="sel-tahun-generate-anomali"></select>
+              </div>
+              <button class="btn-login" id="btn-generate-anomali">⚡ Generate Anomali</button>
+              <div class="toolbar-status" id="log-generate-anomali"></div>
             </div>
           </div>
         </div>
